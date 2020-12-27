@@ -21,20 +21,22 @@ def lambda_handler(event, context):
         req = json.loads(req)
     
     retvals=[]
-    if 'orderOwner' in req:
+    query_args = {}
+    if 'fields' in req:
+        query_args['ProjectionExpression'] = ", ".join(req['fields'])
+    
+    if 'orderOwner' in req and 'any' != req['orderOwner']:
         # Expression attribute names can only reference items in the projection expression.
         #ProjectionExpression=", ".join(req['fields']),
-        query_args = {}
         if 'orderId' in req:
             query_args['KeyConditionExpression'] = Key('orderOwner').eq(req['orderOwner']) & Key('orderId').eq(req['orderId'])
         else:
             query_args['KeyConditionExpression'] = Key('orderOwner').eq(req['orderOwner'])
 
-        if 'fields' in req:
-            query_args['ProjectionExpression'] = ", ".join(req['fields'])
-
         response = table.query(**query_args)
-                
+        retvals=response['Items']
+    else:
+        response = table.scan(**query_args)
         retvals=response['Items']
 
     retvals = json.dumps(retvals, default=json_default_encoder)
