@@ -9,7 +9,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var summaryConfigQueryGql = `
+var summaryQueryGql = `
 {
   summaryByOwnerId(ownerId: "Bob") {
   	totalDeliveryMinutes
@@ -23,6 +23,35 @@ var summaryConfigQueryGql = `
     groupSummary {
       groupId
       totalAmountCollected
+    }
+  }
+}
+`
+
+var frConfigQueryGql = `
+{
+  config {
+    description
+    kind
+    isLocked
+    neighborhoods {
+      name
+      distributionPoint
+    }
+    mulchDeliveryConfigs {
+      id
+      date
+      newOrderCutoffDate
+    }
+    products {
+      id
+      label
+      unitPrice
+      minUnits
+      priceBreaks {
+        gt
+        unitPrice
+      }
     }
   }
 }
