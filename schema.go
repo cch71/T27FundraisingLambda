@@ -1,11 +1,9 @@
-package frsvc
+package main
 
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"os"
 
 	"github.com/graphql-go/graphql"
 )
@@ -18,6 +16,21 @@ func init() {
 
 	queryFields := make(map[string]*graphql.Field)
 	mutationFields := make(map[string]*graphql.Field)
+
+	//////////////////////////////////////////////////////////////////////////////
+	// Mulch Timecard Common Types
+	mulchTimecardType := graphql.NewObject(graphql.ObjectConfig{
+		Name:        "MulchTimecardType",
+		Description: "Mulch Timecard Record Type",
+		Fields: graphql.Fields{
+			"id":               &graphql.Field{Type: graphql.String},
+			"lastModifiedTime": &graphql.Field{Type: graphql.String},
+			"deliveryId":       &graphql.Field{Type: graphql.Int},
+			"timeIn":           &graphql.Field{Type: graphql.String},
+			"timeOut":          &graphql.Field{Type: graphql.String},
+			"timeTotal":        &graphql.Field{Type: graphql.String},
+		},
+	})
 
 	//////////////////////////////////////////////////////////////////////////////
 	// Order Common Types
@@ -136,7 +149,7 @@ func init() {
 
 			newMulchOrder := MulchOrderType{}
 			json.Unmarshal([]byte(jsonString), &newMulchOrder)
-			return createMulchOrder(newMulchOrder), nil
+			return CreateMulchOrder(newMulchOrder), nil
 		},
 	}
 
@@ -158,7 +171,7 @@ func init() {
 
 			updatedMulchOrder := MulchOrderType{}
 			json.Unmarshal([]byte(jsonString), &updatedMulchOrder)
-			return updateMulchOrder(updatedMulchOrder), nil
+			return UpdateMulchOrder(updatedMulchOrder), nil
 		},
 	}
 
@@ -172,7 +185,7 @@ func init() {
 			},
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			return deleteMulchOrder(p.Args["orderId"].(string)), nil
+			return DeleteMulchOrder(p.Args["orderId"].(string)), nil
 		},
 	}
 
@@ -189,7 +202,7 @@ func init() {
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 			// if is_mulch_order getMulchOrder Else get etc...
-			return getMulchOrder(p.Args["orderId"].(string)), nil
+			return GetMulchOrder(p.Args["orderId"].(string)), nil
 		},
 	}
 
@@ -204,7 +217,32 @@ func init() {
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 			// if is_mulch_order getMulchOrder Else get etc...
-			return getMulchOrders(p.Args["ownerId"].(string)), nil
+			id := ""
+			if val, ok := p.Args["ownerId"]; ok {
+				id = val.(string)
+			}
+			return GetMulchOrders(id), nil
+		},
+	}
+
+	//////////////////////////////////////////////////////////////////////////////
+	// Timecard Query Types
+	queryFields["mulchTimeCards"] = &graphql.Field{
+		Type:        graphql.NewList(mulchTimecardType),
+		Description: "Retrieves Timecards for Mulch Delivery",
+		Args: graphql.FieldConfigArgument{
+			"id": &graphql.ArgumentConfig{
+				Description: "The id for which data should be returned.  If empty then all orders are returned",
+				Type:        graphql.String,
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// if is_mulch_order getMulchOrder Else get etc...
+			id := ""
+			if val, ok := p.Args["id"]; ok {
+				id = val.(string)
+			}
+			return GetMulchTimeCards(id), nil
 		},
 	}
 
@@ -276,7 +314,7 @@ func init() {
 		Type:        configType,
 		Description: "Queries for Summary information based on Owner ID",
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			return getFundraisingConfig()
+			return GetFundraisingConfig()
 		},
 	}
 
@@ -286,17 +324,17 @@ func init() {
 		Name:        "OwnerIdSummaryType",
 		Description: "Summary inforamation for a specfic OnwerID",
 		Fields: graphql.Fields{
-			"totalDeliveryMinutes":          &graphql.Field{Type: graphql.Int},
-			"totalNumBagsSold":              &graphql.Field{Type: graphql.Int},
-			"totalNumBagsSoldToSpread":      &graphql.Field{Type: graphql.Int},
-			"totalCollectedForDonations":    &graphql.Field{Type: graphql.String},
-			"totalCollectedForBags":         &graphql.Field{Type: graphql.String},
-			"totalCollectedForBagsToSpread": &graphql.Field{Type: graphql.String},
-			"totalAmountCollected":          &graphql.Field{Type: graphql.String},
-			"allocationsFromDelivery":       &graphql.Field{Type: graphql.String},
-			"allocationsFromBagsSold":       &graphql.Field{Type: graphql.String},
-			"allocationsFromBagsSpread":     &graphql.Field{Type: graphql.String},
-			"allocationsTotal":              &graphql.Field{Type: graphql.String},
+			"totalDeliveryMinutes":                &graphql.Field{Type: graphql.Int},
+			"totalNumBagsSold":                    &graphql.Field{Type: graphql.Int},
+			"totalNumBagsSoldToSpread":            &graphql.Field{Type: graphql.Int},
+			"totalAmountCollectedForDonations":    &graphql.Field{Type: graphql.String},
+			"totalAmountCollectedForBags":         &graphql.Field{Type: graphql.String},
+			"totalAmountCollectedForBagsToSpread": &graphql.Field{Type: graphql.String},
+			"totalAmountCollected":                &graphql.Field{Type: graphql.String},
+			"allocationsFromDelivery":             &graphql.Field{Type: graphql.String},
+			"allocationsFromBagsSold":             &graphql.Field{Type: graphql.String},
+			"allocationsFromBagsSpread":           &graphql.Field{Type: graphql.String},
+			"allocationsTotal":                    &graphql.Field{Type: graphql.String},
 		},
 	})
 	queryFields["summaryByOwnerId"] = &graphql.Field{
@@ -309,7 +347,7 @@ func init() {
 			},
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			return getOwnerIdSummary(p.Args["ownerId"].(string)), nil
+			return GetOwnerIdSummary(p.Args["ownerId"].(string)), nil
 		},
 	}
 
@@ -357,7 +395,7 @@ func init() {
 		Type:        troopSummaryType,
 		Description: "Queries for Summary information for the entire troop",
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			troopSummary := getTroopSummary(11)
+			troopSummary := GetTroopSummary(11)
 			// log.Println("Troop Summary: ", troopSummary)
 			return troopSummary, nil
 		},
@@ -376,188 +414,16 @@ func init() {
 	FrSchema, _ = graphql.NewSchema(schemaConfig)
 }
 
-type OwnerIdSummaryType struct {
-	TotalDeliveryMinutes          int
-	TotalNumBagsSold              int
-	TotalNumBagsSoldToSpread      int
-	TotalCollectedForDonations    string
-	TotalCollectedForBags         string
-	TotalCollectedForBagsToSpread string
-	TotalAmountCollected          string
-	AllocationsFromDelivery       string
-	AllocationsFromBagsSold       string
-	AllocationsFromBagsSpread     string
-	AllocationsTotal              string
-}
-
-func getOwnerIdSummary(ownerId string) OwnerIdSummaryType {
-	log.Println("Getting Summary for onwerId: ", ownerId)
-	return OwnerIdSummaryType{
-		TotalDeliveryMinutes:       408,
-		TotalNumBagsSold:           24,
-		TotalCollectedForDonations: "52.44",
+func MakeGqlQuery(gql string) ([]byte, error) {
+	params := graphql.Params{Schema: FrSchema, RequestString: gql}
+	r := graphql.Do(params)
+	if len(r.Errors) > 0 {
+		log.Printf("failed to execute graphql operation, errors: %+v", r.Errors)
 	}
-}
-
-type TopSellerType struct {
-	Name                 string
-	TotalAmountCollected string
-}
-
-type GroupSummaryType struct {
-	GroupId              string
-	TotalAmountCollected string
-}
-
-type TroopSummaryType struct {
-	TotalAmountCollected string
-	GroupSummary         []GroupSummaryType
-	TopSellers           []TopSellerType
-}
-
-func getTroopSummary(numSellers int) TroopSummaryType {
-	log.Println("Getting this many top sellers: ", numSellers)
-	return TroopSummaryType{
-		TotalAmountCollected: "66.75",
-		GroupSummary:         []GroupSummaryType{GroupSummaryType{GroupId: "bears", TotalAmountCollected: "22.34"}, GroupSummaryType{GroupId: "lions", TotalAmountCollected: "42.34"}},
-		TopSellers:           []TopSellerType{TopSellerType{Name: "John", TotalAmountCollected: "11.23"}},
-	}
-}
-
-type CustomerType struct {
-	Addr1        string
-	Addr2        string
-	Phone        string
-	Neighborhood string
-	FirstName    string
-	LastName     string
-}
-
-type MulchProductsType struct {
-	BagsSold                  int
-	BagsToSpread              int
-	AmountChargedForBags      string
-	AmountChargedForSpreading string
-}
-
-type MulchOrderType struct {
-	OrderId                      string
-	OwnerId                      string
-	LastModifiedTime             string
-	SpecialInstructions          string
-	AmountFromDonationsCollected string
-	AmountFromCashCollected      string
-	AmountFromChecksCollected    string
-	AmountTotalCollected         string
-	CheckNumbers                 []string
-	WillCollectMoneyLater        bool
-	IsVerified                   bool
-	Customer                     CustomerType
-	Purchases                    MulchProductsType
-}
-
-func getMulchOrders(ownerId string) []MulchOrderType {
-	log.Println("Retrieving OwnerId: ", ownerId)
-	return []MulchOrderType{
-		MulchOrderType{
-			OrderId:                 "24",
-			OwnerId:                 "BobbyJo",
-			LastModifiedTime:        "Now+",
-			AmountFromCashCollected: "22.11",
-			AmountTotalCollected:    "22.11",
-			Customer: CustomerType{
-				Addr1:        "192 Subway",
-				Neighborhood: "Sesame",
-				Phone:        "444.444.4442",
-				FirstName:    "James",
-				LastName:     "Something",
-			},
-			Purchases: MulchProductsType{
-				BagsSold:             24,
-				AmountChargedForBags: "22.11",
-			},
-		},
-	}
-}
-
-func getMulchOrder(orderId string) MulchOrderType {
-	log.Println("Retrieving OrderID: ", orderId)
-	return MulchOrderType{
-		OrderId:                 "24",
-		OwnerId:                 "BobbyJo",
-		LastModifiedTime:        "Now+",
-		AmountFromCashCollected: "22.11",
-		AmountTotalCollected:    "22.11",
-		Customer: CustomerType{
-			Addr1:        "192 Subway",
-			Neighborhood: "Sesame",
-			Phone:        "444.444.4442",
-			FirstName:    "James",
-			LastName:     "Something",
-		},
-		Purchases: MulchProductsType{
-			BagsSold:             24,
-			AmountChargedForBags: "22.11",
-		},
-	}
-}
-
-func createMulchOrder(order MulchOrderType) string {
-	log.Println("Creating Order: ", order)
-	return order.OrderId
-}
-
-func updateMulchOrder(order MulchOrderType) string {
-	log.Println("Updating Order: ", order)
-	return order.OrderId
-}
-
-func deleteMulchOrder(orderId string) string {
-	log.Println("Deleteing OrderID: ", orderId)
-	return orderId
-}
-
-type MulchDeliveryConfigType struct {
-	Id                 string `json:"id"`
-	Date               string `json:"date"`
-	NewOrderCutoffDate string `json:"newOrderCutoffDate"`
-}
-
-type NeighborhoodsType struct {
-	DistributionPoint string `json:"distPt"`
-}
-
-type ProductPriceBreaks struct {
-	Gt        int    `json:"gt"`
-	UnitPrice string `json:"unitPrice"`
-}
-
-type ProductType struct {
-	Id          string               `json:"id"`
-	Label       string               `json:"label"`
-	MinUnits    int                  `json:"minUnits"`
-	UnitPrice   string               `json:"unitPrice"`
-	PriceBreaks []ProductPriceBreaks `json:"priceBreaks"`
-}
-
-type FrConfigType struct {
-	Kind                 string                       `json:"kind"`
-	Description          string                       `json:"description"`
-	IsLocked             bool                         `json:"isLocked"`
-	Neighborhoods        map[string]NeighborhoodsType `json:"neighborhoods"`
-	MulchDeliveryConfigs []MulchDeliveryConfigType    `json:"mulchDeliveryConfigs"`
-	Products             []ProductType                `json:"products"`
-}
-
-func getFundraisingConfig() (FrConfigType, error) {
-	jsonFile, err := os.Open("/Users/chamilton/wip/t27/t27utils/v2/T27FundraiserConfig.json")
+	rJSON, err := json.Marshal(r)
 	if err != nil {
-		return FrConfigType{}, err
+		log.Println("Error encoding JSON results: ", err, " for gql: ", gql)
+		return nil, err
 	}
-	defer jsonFile.Close()
-	byteValue, _ := ioutil.ReadAll(jsonFile)
-	frConfig := FrConfigType{}
-	json.Unmarshal(byteValue, &frConfig)
-	return frConfig, nil
-
+	return rJSON, nil
 }
