@@ -13,11 +13,13 @@ import (
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	//"github.com/vishalkuo/bimap"
 )
 
 var (
 	dbMutex sync.Mutex
 	Db      *pgxpool.Pool
+	//mulchOrderFields bimap.BiMap
 )
 
 func InitDb() error {
@@ -32,6 +34,23 @@ func InitDb() error {
 			Db = cnxn
 		}
 	}
+
+	// GraphQL<->SQL Table Mapping
+	// 	mulchOrderFields = bimap.NewBiMap()
+	// 	mulchOrderFields.Insert("orderId", "order_id")
+	// 	mulchOrderFields.Insert("ownerId", "owner_id")
+	// 	mulchOrderFields.Insert("lastModifiedTime", "last_modified_time")
+	// 	mulchOrderFields.Insert("specialInstructions", "special_instructions")
+	// 	mulchOrderFields.Insert("amountFromDonationsCollected", "donation_amount_collected")
+	// 	mulchOrderFields.Insert("amountFromCashCollected", "cash_amount_collected")
+	// 	mulchOrderFields.Insert("amountFromChecksCollected", "check_amount_collected")
+	// 	mulchOrderFields.Insert("amountTotalCollected", "total_amount_collected")
+	// 	mulchOrderFields.Insert("checkNumbers", "check_numbers")
+	// 	mulchOrderFields.Insert("willCollectMoneyLater", "will_collect_money_later")
+	// 	mulchOrderFields.Insert("isVerified", "is_verified")
+	// 	mulchOrderFields.Insert("deliveryId", "delivery_id")
+	// 	mulchOrderFields.Insert("yearOrdered", "year_ordered")
+
 	return nil
 }
 
@@ -137,10 +156,28 @@ type MulchOrderType struct {
 	IsVerified                   bool
 	Customer                     CustomerType
 	Purchases                    MulchProductsType
+	ArchiveYear                  string
 }
 
-func GetMulchOrders(ownerId string) []MulchOrderType {
-	log.Println("Retrieving OwnerId: ", ownerId)
+type GetMulchOrdersParams struct {
+	OwnerId       string
+	GqlFields     []string
+	IsFromArchive bool
+	ArchiveYear   string
+}
+
+func mulchOrderGql2SqlMap(gqlFields []string) []string {
+	sqlFields := []string{}
+	for gqlField := range gqlFields {
+		log.Println(gqlField)
+		// mulchOrderFields.Get(gqlField)
+
+	}
+	return sqlFields
+}
+
+func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
+	log.Println("Retrieving OwnerId: ", params.OwnerId)
 	return []MulchOrderType{
 		MulchOrderType{
 			OrderId:                 "24",
@@ -163,8 +200,14 @@ func GetMulchOrders(ownerId string) []MulchOrderType {
 	}
 }
 
-func GetMulchOrder(orderId string) MulchOrderType {
-	log.Println("Retrieving OrderID: ", orderId)
+type GetMulchOrderParams struct {
+	OrderId       string
+	GqlFields     []string
+	IsFromArchive bool
+}
+
+func GetMulchOrder(params GetMulchOrderParams) MulchOrderType {
+	log.Println("Retrieving OrderID: ", params.OrderId)
 	return MulchOrderType{
 		OrderId:                 "24",
 		OwnerId:                 "BobbyJo",
@@ -277,7 +320,8 @@ func GetMulchTimeCards(id string) []MulchTimecardType {
 
 	for rows.Next() {
 		tc := MulchTimecardType{}
-		err = rows.Scan(&tc.Id, &tc.DeliveryId, &tc.LastModifiedTime, &tc.TimeIn, &tc.TimeOut, &tc.TimeTotal)
+		inputs := []interface{}{&tc.Id, &tc.DeliveryId, &tc.LastModifiedTime, &tc.TimeIn, &tc.TimeOut, &tc.TimeTotal}
+		err = rows.Scan(inputs...)
 		if err != nil {
 			log.Println("Reading timecard row failed: ", err)
 			continue

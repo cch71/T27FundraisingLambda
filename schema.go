@@ -12,6 +12,33 @@ var (
 	FrSchema graphql.Schema
 )
 
+// Function for retrieving selected fields
+func getSelectedFields(selectionPath []string, resolveParams graphql.ResolveParams) []string {
+	// fields := resolveParams.Info.FieldASTs
+	// for _, propName := range selectionPath {
+	// 	found := false
+	// 	for _, field := range fields {
+	// 		if field.Name.Value == propName {
+	// 			selections := field.SelectionSet.Selections
+	// 			fields = make([]*ast.Field, 0)
+	// 			for _, selection := range selections {
+	// 				fields = append(fields, selection.(*ast.Field))
+	// 			}
+	// 			found = true
+	// 			break
+	// 		}
+	// 	}
+	// 	if !found {
+	// 		return []string{}
+	// 	}
+	// }
+	var collect []string
+	// for _, field := range fields {
+	// 	collect = append(collect, field.Name.Value)
+	// }
+	return collect
+}
+
 func init() {
 
 	queryFields := make(map[string]*graphql.Field)
@@ -78,6 +105,27 @@ func init() {
 			"purchases":                    &graphql.Field{Type: mulchProductType},
 			"spreaders":                    &graphql.Field{Type: graphql.NewList(graphql.String)},
 			"deliveryId":                   &graphql.Field{Type: graphql.String},
+		},
+	})
+	archivedMulchOrderType := graphql.NewObject(graphql.ObjectConfig{
+		Name:        "ArchivedMulchOrderType",
+		Description: "Archive Mulch Order Record Type",
+		Fields: graphql.Fields{
+			"orderId":                      &graphql.Field{Type: graphql.String},
+			"ownerId":                      &graphql.Field{Type: graphql.String},
+			"lastModifiedTime":             &graphql.Field{Type: graphql.String},
+			"specialInstructions":          &graphql.Field{Type: graphql.String},
+			"amountFromDonationsCollected": &graphql.Field{Type: graphql.String},
+			"amountFromCashCollected":      &graphql.Field{Type: graphql.String},
+			"amountFromChecksCollected":    &graphql.Field{Type: graphql.String},
+			"amountTotalCollected":         &graphql.Field{Type: graphql.String},
+			"checkNumbers":                 &graphql.Field{Type: graphql.NewList(graphql.String)},
+			"willCollectMoneyLater":        &graphql.Field{Type: graphql.Boolean},
+			"isVerified":                   &graphql.Field{Type: graphql.Boolean},
+			"customer":                     &graphql.Field{Type: customerType},
+			"purchases":                    &graphql.Field{Type: mulchProductType},
+			"spreaders":                    &graphql.Field{Type: graphql.NewList(graphql.String)},
+			"yearOrdered":                  &graphql.Field{Type: graphql.String},
 		},
 	})
 
@@ -202,7 +250,12 @@ func init() {
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 			// if is_mulch_order getMulchOrder Else get etc...
-			return GetMulchOrder(p.Args["orderId"].(string)), nil
+			params := GetMulchOrderParams{
+				OrderId:       p.Args["orderId"].(string),
+				GqlFields:     getSelectedFields([]string{"mulchOrder"}, p),
+				IsFromArchive: false,
+			}
+			return GetMulchOrder(params), nil
 		},
 	}
 
@@ -217,14 +270,65 @@ func init() {
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 			// if is_mulch_order getMulchOrder Else get etc...
-			id := ""
-			if val, ok := p.Args["ownerId"]; ok {
-				id = val.(string)
+			params := GetMulchOrdersParams{
+				IsFromArchive: false,
+				GqlFields:     getSelectedFields([]string{"mulchOrders"}, p),
 			}
-			return GetMulchOrders(id), nil
+			if val, ok := p.Args["ownerId"]; ok {
+				params.OwnerId = val.(string)
+			}
+			return GetMulchOrders(params), nil
 		},
 	}
 
+	queryFields["archivedMulchOrder"] = &graphql.Field{
+		Type:        archivedMulchOrderType,
+		Description: "Retrieves order associated with orderId",
+		Args: graphql.FieldConfigArgument{
+			"orderId": &graphql.ArgumentConfig{
+				Description: "The id of the order that should be returned",
+				Type:        graphql.NewNonNull(graphql.String),
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// if is_mulch_order getMulchOrder Else get etc...
+			params := GetMulchOrderParams{
+				OrderId:       p.Args["orderId"].(string),
+				GqlFields:     getSelectedFields([]string{"archivedMulchOrder"}, p),
+				IsFromArchive: true,
+			}
+			return GetMulchOrder(params), nil
+		},
+	}
+
+	queryFields["archivedMulchOrders"] = &graphql.Field{
+		Type:        graphql.NewList(archivedMulchOrderType),
+		Description: "Retrieves order associated with ownerId",
+		Args: graphql.FieldConfigArgument{
+			"ownerId": &graphql.ArgumentConfig{
+				Description: "The owner id for which data should be returned.  If empty then all orders are returned",
+				Type:        graphql.String,
+			},
+			"archiveYear": &graphql.ArgumentConfig{
+				Description: "If specified then the year (YYYY) from the archive when the order was made",
+				Type:        graphql.String,
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// if is_mulch_order getMulchOrder Else get etc...
+			params := GetMulchOrdersParams{
+				IsFromArchive: true,
+				GqlFields:     getSelectedFields([]string{"archivedMulchOrders"}, p),
+			}
+			if val, ok := p.Args["ownerId"]; ok {
+				params.OwnerId = val.(string)
+			}
+			if val, ok := p.Args["archiveYear"]; ok {
+				params.ArchiveYear = val.(string)
+			}
+			return GetMulchOrders(params), nil
+		},
+	}
 	//////////////////////////////////////////////////////////////////////////////
 	// Timecard Query Types
 	queryFields["mulchTimeCards"] = &graphql.Field{
