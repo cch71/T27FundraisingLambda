@@ -61,6 +61,7 @@ var timecardQueryGql1 = `
 {
     mulchTimeCards(id: "axell") {
         id
+        deliveryId
         lastModifiedTime
         timeIn
         timeOut
@@ -73,6 +74,7 @@ var timecardQueryGql2 = `
 {
     mulchTimeCards {
         id
+        deliveryId
         lastModifiedTime
         timeIn
         timeOut
@@ -87,6 +89,55 @@ mutation {
     orderId: "24"
     ownerId: "Blogger1"
   })
+}
+`
+
+var archivedOrderQueryGql1 = `
+{
+  archivedMulchOrder(orderId: "04a4c1b4-6a6d-4e20-a09d-1dc28d7d5955") {
+    ownerId
+    amountTotalCollected
+    yearOrdered
+    customer {
+        name
+        addr1
+        addr2
+        phone
+        email
+        neighborhood
+    }
+    purchases {
+        bagsSold
+        bagsToSpread
+        amountChargedForBags
+        amountChargedForSpreading
+    }
+  }
+}
+`
+
+var archivedOrdersQueryGql1 = `
+{
+  archivedMulchOrders {
+    orderId
+    ownerId
+    amountTotalCollected
+    yearOrdered
+    customer {
+        name
+        addr1
+        addr2
+        phone
+        email
+        neighborhood
+    }
+    purchases {
+        bagsSold
+        bagsToSpread
+        amountChargedForBags
+        amountChargedForSpreading
+    }
+  }
 }
 `
 
@@ -135,4 +186,24 @@ func TestGraphQLTimeCards(t *testing.T) {
 	// 	}
 	// 	t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
 	// }
+}
+
+func TestGraphQLArchivedOrder(t *testing.T) {
+	{
+		rJSON, err := MakeGqlQuery(archivedOrderQueryGql1)
+		if err != nil {
+			t.Fatal("GraphQL Query Failed: ", err)
+		}
+		t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
+	}
+}
+
+func TestGraphQLArchivedOrders(t *testing.T) {
+	{
+		rJSON, err := MakeGqlQuery(archivedOrdersQueryGql1)
+		if err != nil {
+			t.Fatal("GraphQL Query Failed: ", err)
+		}
+		t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/graphql-go/graphql"
+	ast "github.com/graphql-go/graphql/language/ast"
 )
 
 var (
@@ -14,28 +15,29 @@ var (
 
 // Function for retrieving selected fields
 func getSelectedFields(selectionPath []string, resolveParams graphql.ResolveParams) []string {
-	// fields := resolveParams.Info.FieldASTs
-	// for _, propName := range selectionPath {
-	// 	found := false
-	// 	for _, field := range fields {
-	// 		if field.Name.Value == propName {
-	// 			selections := field.SelectionSet.Selections
-	// 			fields = make([]*ast.Field, 0)
-	// 			for _, selection := range selections {
-	// 				fields = append(fields, selection.(*ast.Field))
-	// 			}
-	// 			found = true
-	// 			break
-	// 		}
-	// 	}
-	// 	if !found {
-	// 		return []string{}
-	// 	}
-	// }
+	fields := resolveParams.Info.FieldASTs
+
+	for _, propName := range selectionPath {
+		found := false
+		for _, field := range fields {
+			if field.Name.Value == propName {
+				selections := field.SelectionSet.Selections
+				fields = make([]*ast.Field, 0)
+				for _, selection := range selections {
+					fields = append(fields, selection.(*ast.Field))
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			return []string{}
+		}
+	}
 	var collect []string
-	// for _, field := range fields {
-	// 	collect = append(collect, field.Name.Value)
-	// }
+	for _, field := range fields {
+		collect = append(collect, field.Name.Value)
+	}
 	return collect
 }
 
@@ -70,8 +72,7 @@ func init() {
 			"phone":        &graphql.Field{Type: graphql.String},
 			"email":        &graphql.Field{Type: graphql.String},
 			"neighborhood": &graphql.Field{Type: graphql.String},
-			"firstName":    &graphql.Field{Type: graphql.String},
-			"lastName":     &graphql.Field{Type: graphql.String},
+			"name":         &graphql.Field{Type: graphql.String},
 		},
 	})
 
@@ -81,8 +82,8 @@ func init() {
 		Fields: graphql.Fields{
 			"bagsSold":                  &graphql.Field{Type: graphql.Int},
 			"bagsToSpread":              &graphql.Field{Type: graphql.Int},
-			"AmountChargedForBags":      &graphql.Field{Type: graphql.String},
-			"AmountChargedForSpreading": &graphql.Field{Type: graphql.String},
+			"amountChargedForBags":      &graphql.Field{Type: graphql.String},
+			"amountChargedForSpreading": &graphql.Field{Type: graphql.String},
 		},
 	})
 
@@ -138,8 +139,7 @@ func init() {
 			"phone":        &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"email":        &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"neighborhood": &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"firstName":    &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"lastName":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"name":         &graphql.InputObjectFieldConfig{Type: graphql.String},
 		},
 	})
 

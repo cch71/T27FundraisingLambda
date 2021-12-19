@@ -8,12 +8,12 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
-	//"github.com/vishalkuo/bimap"
 )
 
 var (
@@ -34,22 +34,6 @@ func InitDb() error {
 			Db = cnxn
 		}
 	}
-
-	// GraphQL<->SQL Table Mapping
-	// 	mulchOrderFields = bimap.NewBiMap()
-	// 	mulchOrderFields.Insert("orderId", "order_id")
-	// 	mulchOrderFields.Insert("ownerId", "owner_id")
-	// 	mulchOrderFields.Insert("lastModifiedTime", "last_modified_time")
-	// 	mulchOrderFields.Insert("specialInstructions", "special_instructions")
-	// 	mulchOrderFields.Insert("amountFromDonationsCollected", "donation_amount_collected")
-	// 	mulchOrderFields.Insert("amountFromCashCollected", "cash_amount_collected")
-	// 	mulchOrderFields.Insert("amountFromChecksCollected", "check_amount_collected")
-	// 	mulchOrderFields.Insert("amountTotalCollected", "total_amount_collected")
-	// 	mulchOrderFields.Insert("checkNumbers", "check_numbers")
-	// 	mulchOrderFields.Insert("willCollectMoneyLater", "will_collect_money_later")
-	// 	mulchOrderFields.Insert("isVerified", "is_verified")
-	// 	mulchOrderFields.Insert("deliveryId", "delivery_id")
-	// 	mulchOrderFields.Insert("yearOrdered", "year_ordered")
 
 	return nil
 }
@@ -130,16 +114,18 @@ type CustomerType struct {
 	Addr1        string
 	Addr2        string
 	Phone        string
+	Email        string
 	Neighborhood string
-	FirstName    string
-	LastName     string
+	Name         string
 }
 
 type MulchProductsType struct {
-	BagsSold                  int
-	BagsToSpread              int
-	AmountChargedForBags      string
-	AmountChargedForSpreading string
+	// Bags                      int // legacy
+	//Spreading                 int // legacy
+	BagsSold                  int    `json:"bags,omitempty" json:"bagsSold"`
+	BagsToSpread              int    `json:"spreading,omitempty" json:"bagsToSpread"`
+	AmountChargedForBags      string `json:"amountChargedForBags,omitempty"`
+	AmountChargedForSpreading string `json:"amountChargedForSpreading,omitempty"`
 }
 
 type MulchOrderType struct {
@@ -156,7 +142,7 @@ type MulchOrderType struct {
 	IsVerified                   bool
 	Customer                     CustomerType
 	Purchases                    MulchProductsType
-	ArchiveYear                  string
+	YearOrdered                  string
 }
 
 type GetMulchOrdersParams struct {
@@ -166,18 +152,71 @@ type GetMulchOrdersParams struct {
 	ArchiveYear   string
 }
 
-func mulchOrderGql2SqlMap(gqlFields []string) []string {
+func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]string, []interface{}) {
+
 	sqlFields := []string{}
-	for gqlField := range gqlFields {
-		log.Println(gqlField)
+	inputs := []interface{}{}
+	for _, gqlField := range gqlFields {
+		// log.Println(gqlField)
+		switch {
+		case gqlField == "orderId":
+			inputs = append(inputs, &orderOutput.OrderId)
+			sqlFields = append(sqlFields, "order_id")
+		case gqlField == "ownerId":
+			inputs = append(inputs, &orderOutput.OwnerId)
+			sqlFields = append(sqlFields, "order_owner_id")
+		case gqlField == "amountTotalCollected":
+			inputs = append(inputs, &orderOutput.AmountTotalCollected)
+			sqlFields = append(sqlFields, "total_amount_collected::string")
+		case gqlField == "yearOrdered":
+			inputs = append(inputs, &orderOutput.YearOrdered)
+			sqlFields = append(sqlFields, "year_ordered::string")
+		case gqlField == "customer":
+			inputs = append(inputs, &orderOutput.Customer.Name)
+			sqlFields = append(sqlFields, "customer_name")
+			inputs = append(inputs, &orderOutput.Customer.Addr1)
+			sqlFields = append(sqlFields, "customer_addr1")
+			inputs = append(inputs, &orderOutput.Customer.Addr2)
+			sqlFields = append(sqlFields, "customer_addr2")
+			inputs = append(inputs, &orderOutput.Customer.Phone)
+			sqlFields = append(sqlFields, "customer_phone")
+			inputs = append(inputs, &orderOutput.Customer.Email)
+			sqlFields = append(sqlFields, "customer_email")
+			inputs = append(inputs, &orderOutput.Customer.Neighborhood)
+			sqlFields = append(sqlFields, "customer_neighborhood")
+		case gqlField == "purchases":
+			inputs = append(inputs, &orderOutput.Purchases)
+			sqlFields = append(sqlFields, "purchases::jsonb")
+		}
+		// GraphQL<->SQL Table Mapping
+		// 	mulchOrderFields = bimap.NewBiMap()
+		// 	mulchOrderFields.Insert("lastModifiedTime", "last_modified_time")
+		// 	mulchOrderFields.Insert("specialInstructions", "special_instructions")
+		// 	mulchOrderFields.Insert("amountFromDonationsCollected", "donation_amount_collected")
+		// 	mulchOrderFields.Insert("amountFromCashCollected", "cash_amount_collected")
+		// 	mulchOrderFields.Insert("amountFromChecksCollected", "check_amount_collected")
+		// 	mulchOrderFields.Insert("checkNumbers", "check_numbers")
+		// 	mulchOrderFields.Insert("willCollectMoneyLater", "will_collect_money_later")
+		// 	mulchOrderFields.Insert("isVerified", "is_verified")
+		// 	mulchOrderFields.Insert("deliveryId", "delivery_id")
 		// mulchOrderFields.Get(gqlField)
 
 	}
-	return sqlFields
+	return sqlFields, inputs
 }
 
 func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
-	log.Println("Retrieving OwnerId: ", params.OwnerId)
+	if 0 == len(params.OwnerId) {
+		log.Println("Retrieving mulch orders. ", "Is targeting archive: ", params.IsFromArchive)
+		log.Println("Selections: ", params.GqlFields)
+
+	} else {
+		log.Println("Retrieving mulch orders. ", "Is targeting archive: ", params.IsFromArchive, " OwnerId: ", params.OwnerId)
+
+	}
+
+	// order := MulchOrderType{}
+	// _sqlFields, _inputs := mulchOrderGql2SqlMap(params.GqlFields, &order)
 	return []MulchOrderType{
 		MulchOrderType{
 			OrderId:                 "24",
@@ -189,8 +228,7 @@ func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 				Addr1:        "192 Subway",
 				Neighborhood: "Sesame",
 				Phone:        "444.444.4442",
-				FirstName:    "James",
-				LastName:     "Something",
+				Name:         "James",
 			},
 			Purchases: MulchProductsType{
 				BagsSold:             24,
@@ -207,25 +245,23 @@ type GetMulchOrderParams struct {
 }
 
 func GetMulchOrder(params GetMulchOrderParams) MulchOrderType {
-	log.Println("Retrieving OrderID: ", params.OrderId)
-	return MulchOrderType{
-		OrderId:                 "24",
-		OwnerId:                 "BobbyJo",
-		LastModifiedTime:        "Now+",
-		AmountFromCashCollected: "22.11",
-		AmountTotalCollected:    "22.11",
-		Customer: CustomerType{
-			Addr1:        "192 Subway",
-			Neighborhood: "Sesame",
-			Phone:        "444.444.4442",
-			FirstName:    "James",
-			LastName:     "Something",
-		},
-		Purchases: MulchProductsType{
-			BagsSold:             24,
-			AmountChargedForBags: "22.11",
-		},
+	log.Println("Retrieving mulch order. ", "Is targeting archive: ", params.IsFromArchive, " OrderId: ", params.OrderId)
+
+	order := MulchOrderType{}
+	sqlFields, inputs := mulchOrderGql2SqlMap(params.GqlFields, &order)
+
+	dbTable := "mulch_orders"
+	if params.IsFromArchive {
+		dbTable = "archived_mulch_orders"
 	}
+	sqlCmd := fmt.Sprintf("select %s from %s where order_id=$1", strings.Join(sqlFields, ","), dbTable)
+	log.Println("SqlCmd: ", sqlCmd)
+	err := Db.QueryRow(context.Background(), sqlCmd, params.OrderId).Scan(inputs...)
+	if err != nil {
+		log.Println("Mulch order query for: ", params.OrderId, " failed", err)
+	}
+	// log.Println("Purchases: ", order.Purchases)
+	return order
 }
 
 func CreateMulchOrder(order MulchOrderType) string {
