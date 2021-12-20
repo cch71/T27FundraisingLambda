@@ -9,7 +9,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var summaryQueryGql = `
+var summaryQueryGql1 = `
 {
   config {
     kind
@@ -17,11 +17,21 @@ var summaryQueryGql = `
     isLocked
   }
   summaryByOwnerId(ownerId: "Bob") {
-  	totalDeliveryMinutes
-  }
-  troopSummary {
+    totalDeliveryMinutes
+    totalNumBagsSold
+    totalNumBagsSoldToSpread
+    totalAmountCollectedForDonations
+    totalAmountCollectedForBags
+    totalAmountCollectedForBagsToSpread
     totalAmountCollected
-    topSellers(numTopSellers: 10) {
+    allocationsFromDelivery
+    allocationsFromBagsSold
+    allocationsFromBagsSpread
+    allocationsTotal
+  }
+  troopSummary(numTopSellers: 10) {
+    totalAmountCollected
+    topSellers {
       totalAmountCollected
       name
     }
@@ -283,6 +293,16 @@ func TestGraphQLSetActiveConfig(t *testing.T) {
 func TestGraphQLActiveConfig(t *testing.T) {
 	{
 		rJSON, err := MakeGqlQuery(activeConfigQueryGql1)
+		if err != nil {
+			t.Fatal("GraphQL Query Failed: ", err)
+		}
+		t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
+	}
+}
+
+func TestGraphQLSummaryQuery(t *testing.T) {
+	{
+		rJSON, err := MakeGqlQuery(summaryQueryGql1)
 		if err != nil {
 			t.Fatal("GraphQL Query Failed: ", err)
 		}

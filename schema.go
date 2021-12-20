@@ -506,7 +506,7 @@ func init() {
 			},
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			return GetOwnerIdSummary(p.Args["ownerId"].(string)), nil
+			return GetSummaryByOwnerId(p.Args["ownerId"].(string))
 		},
 	}
 
@@ -534,29 +534,21 @@ func init() {
 		Fields: graphql.Fields{
 			"totalAmountCollected": &graphql.Field{Type: graphql.String},
 			"groupSummary":         &graphql.Field{Type: graphql.NewList(troopSummaryByGroupType)},
-			"topSellers": &graphql.Field{
-				Type: graphql.NewList(troopSummaryTopSellersType),
-				Args: graphql.FieldConfigArgument{
-					"numTopSellers": &graphql.ArgumentConfig{
-						Description: "The number of top sellers to return",
-						Type:        graphql.NewNonNull(graphql.Int),
-					},
-				},
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					// log.Println("ResolveParams: topSellers ", p.Args["numTopSellers"].(int), " Src: ", p.Source)
-					return p.Source.(TroopSummaryType).TopSellers, nil
-				},
-			},
+			"topSellers":           &graphql.Field{Type: graphql.NewList(troopSummaryTopSellersType)},
 		},
 	})
 
 	queryFields["troopSummary"] = &graphql.Field{
 		Type:        troopSummaryType,
 		Description: "Queries for Summary information for the entire troop",
+		Args: graphql.FieldConfigArgument{
+			"numTopSellers": &graphql.ArgumentConfig{
+				Description: "The number of top sellers to return",
+				Type:        graphql.NewNonNull(graphql.Int),
+			},
+		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			troopSummary := GetTroopSummary(11)
-			// log.Println("Troop Summary: ", troopSummary)
-			return troopSummary, nil
+			return GetTroopSummary(p.Args["numTopSellers"].(int))
 		},
 	}
 

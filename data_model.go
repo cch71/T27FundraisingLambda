@@ -88,13 +88,13 @@ type OwnerIdSummaryType struct {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func GetOwnerIdSummary(ownerId string) OwnerIdSummaryType {
+func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 	log.Println("Getting Summary for onwerId: ", ownerId)
 	return OwnerIdSummaryType{
 		TotalDeliveryMinutes:             408,
 		TotalNumBagsSold:                 24,
 		TotalAmountCollectedForDonations: "52.44",
-	}
+	}, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -121,13 +121,13 @@ type TroopSummaryType struct {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func GetTroopSummary(numSellers int) TroopSummaryType {
-	log.Println("Getting this many top sellers: ", numSellers)
+func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
+	log.Println("Getting this many top sellers: ", numTopSellers)
 	return TroopSummaryType{
 		TotalAmountCollected: "66.75",
 		GroupSummary:         []GroupSummaryType{GroupSummaryType{GroupId: "bears", TotalAmountCollected: "22.34"}, GroupSummaryType{GroupId: "lions", TotalAmountCollected: "42.34"}},
 		TopSellers:           []TopSellerType{TopSellerType{Name: "John", TotalAmountCollected: "11.23"}},
-	}
+	}, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////
