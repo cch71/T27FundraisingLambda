@@ -164,11 +164,11 @@ type MulchOrderType struct {
 	AmountFromChecksCollected    string
 	AmountTotalCollected         string
 	CheckNumbers                 []string
-	WillCollectMoneyLater        bool
-	IsVerified                   bool
+	WillCollectMoneyLater        *bool
+	IsVerified                   *bool
 	Customer                     CustomerType
 	Purchases                    MulchProductsType
-	DeliveryId                   int    // Not in archived GraphQL
+	DeliveryId                   *int   // Not in archived GraphQL
 	YearOrdered                  string // Not in non archived GraphQL
 }
 
@@ -202,19 +202,6 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 		case gqlField == "yearOrdered":
 			inputs = append(inputs, &orderOutput.YearOrdered)
 			sqlFields = append(sqlFields, "year_ordered::string")
-		case gqlField == "customer":
-			inputs = append(inputs, &orderOutput.Customer.Name)
-			sqlFields = append(sqlFields, "customer_name")
-			inputs = append(inputs, &orderOutput.Customer.Addr1)
-			sqlFields = append(sqlFields, "customer_addr1")
-			inputs = append(inputs, &orderOutput.Customer.Addr2)
-			sqlFields = append(sqlFields, "customer_addr2")
-			inputs = append(inputs, &orderOutput.Customer.Phone)
-			sqlFields = append(sqlFields, "customer_phone")
-			inputs = append(inputs, &orderOutput.Customer.Email)
-			sqlFields = append(sqlFields, "customer_email")
-			inputs = append(inputs, &orderOutput.Customer.Neighborhood)
-			sqlFields = append(sqlFields, "customer_neighborhood")
 		case gqlField == "purchases":
 			inputs = append(inputs, &orderOutput.Purchases)
 			sqlFields = append(sqlFields, "purchases::jsonb")
@@ -234,17 +221,30 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 			inputs = append(inputs, &orderOutput.AmountFromChecksCollected)
 			sqlFields = append(sqlFields, "check_amount_collected::string")
 		case gqlField == "checkNumbers":
-			inputs = append(inputs, &orderOutput.WillCollectMoneyLater)
+			inputs = append(inputs, &orderOutput.CheckNumbers)
 			sqlFields = append(sqlFields, "check_numbers::jsonb")
 		case gqlField == "deliveryId":
 			inputs = append(inputs, &orderOutput.DeliveryId)
 			sqlFields = append(sqlFields, "delivery_id")
 		case gqlField == "willCollectMoneyLater":
-			inputs = append(inputs, &orderOutput.Purchases)
+			inputs = append(inputs, &orderOutput.WillCollectMoneyLater)
 			sqlFields = append(sqlFields, "will_collect_money_later")
 		case gqlField == "isVerified":
 			inputs = append(inputs, &orderOutput.IsVerified)
 			sqlFields = append(sqlFields, "is_verified")
+		case gqlField == "customer":
+			inputs = append(inputs, &orderOutput.Customer.Name)
+			sqlFields = append(sqlFields, "customer_name")
+			inputs = append(inputs, &orderOutput.Customer.Addr1)
+			sqlFields = append(sqlFields, "customer_addr1")
+			inputs = append(inputs, &orderOutput.Customer.Addr2)
+			sqlFields = append(sqlFields, "customer_addr2")
+			inputs = append(inputs, &orderOutput.Customer.Phone)
+			sqlFields = append(sqlFields, "customer_phone")
+			inputs = append(inputs, &orderOutput.Customer.Email)
+			sqlFields = append(sqlFields, "customer_email")
+			inputs = append(inputs, &orderOutput.Customer.Neighborhood)
+			sqlFields = append(sqlFields, "customer_neighborhood")
 		default:
 			log.Println("Do not know how to handle GraphQL Field: ", gqlField)
 		}
@@ -341,25 +341,194 @@ func GetMulchOrder(params GetMulchOrderParams) MulchOrderType {
 	return order
 }
 
+func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
+	order.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
+	values := []interface{}{}
+	valIdxs := []string{}
+	valIdx := 1
+	sqlFields := []string{}
+
+	// Do OrderID first because it is always there
+	sqlFields = append(sqlFields, "order_id")
+	values = append(values, order.OrderId)
+	valIdxs = append(valIdxs, fmt.Sprintf("$%d::uuid", valIdx))
+	valIdx++
+
+	sqlFields = append(sqlFields, "last_modified_time")
+	values = append(values, order.LastModifiedTime)
+	valIdxs = append(valIdxs, fmt.Sprintf("$%d::timestamp", valIdx))
+	valIdx++
+
+	if len(order.OwnerId) != 0 {
+		sqlFields = append(sqlFields, "order_owner_id")
+		values = append(values, order.OwnerId)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+
+	if len(order.AmountTotalCollected) != 0 {
+		sqlFields = append(sqlFields, "total_amount_collected")
+		values = append(values, order.AmountTotalCollected)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
+		valIdx++
+	}
+	if 0 != order.Purchases.BagsSold || 0 != order.Purchases.BagsToSpread {
+		sqlFields = append(sqlFields, "purchases")
+		values = append(values, order.Purchases)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::jsonb", valIdx))
+		valIdx++
+	}
+	if len(order.SpecialInstructions) != 0 {
+		sqlFields = append(sqlFields, "special_instructions")
+		values = append(values, order.SpecialInstructions)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+	if len(order.AmountFromDonationsCollected) != 0 {
+		sqlFields = append(sqlFields, "donation_amount_collected")
+		values = append(values, order.AmountFromDonationsCollected)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
+		valIdx++
+	}
+	if len(order.AmountFromCashCollected) != 0 {
+		sqlFields = append(sqlFields, "cash_amount_collected")
+		values = append(values, order.AmountFromCashCollected)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
+		valIdx++
+	}
+	if len(order.AmountFromChecksCollected) != 0 {
+		sqlFields = append(sqlFields, "check_amount_collected")
+		values = append(values, order.AmountFromChecksCollected)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
+		valIdx++
+	}
+	if len(order.CheckNumbers) != 0 {
+		sqlFields = append(sqlFields, "check_numbers")
+		values = append(values, order.CheckNumbers)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::jsonb", valIdx))
+		valIdx++
+	}
+	if nil != order.DeliveryId {
+		sqlFields = append(sqlFields, "delivery_id")
+		values = append(values, *order.DeliveryId)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::int", valIdx))
+		valIdx++
+	}
+	if nil != order.WillCollectMoneyLater {
+		sqlFields = append(sqlFields, "will_collect_money_later")
+		values = append(values, *order.WillCollectMoneyLater)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::bool", valIdx))
+		valIdx++
+	}
+	if nil != order.IsVerified {
+		sqlFields = append(sqlFields, "is_verified")
+		values = append(values, *order.IsVerified)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::bool", valIdx))
+		valIdx++
+	}
+	if len(order.Customer.Name) != 0 {
+		sqlFields = append(sqlFields, "customer_name")
+		values = append(values, order.Customer.Name)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+	if len(order.Customer.Addr1) != 0 {
+		sqlFields = append(sqlFields, "customer_addr1")
+		values = append(values, order.Customer.Addr1)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+	if len(order.Customer.Addr2) != 0 {
+		sqlFields = append(sqlFields, "customer_addr2")
+		values = append(values, order.Customer.Addr2)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+	if len(order.Customer.Phone) != 0 {
+		sqlFields = append(sqlFields, "customer_phone")
+		values = append(values, order.Customer.Phone)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+	if len(order.Customer.Email) != 0 {
+		sqlFields = append(sqlFields, "customer_email")
+		values = append(values, order.Customer.Email)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+	if len(order.Customer.Neighborhood) != 0 {
+		sqlFields = append(sqlFields, "customer_neighborhood")
+		values = append(values, order.Customer.Neighborhood)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+
+	return sqlFields, valIdxs, values
+}
+
 ////////////////////////////////////////////////////////////////////////////
 //
-func CreateMulchOrder(order MulchOrderType) string {
+func CreateMulchOrder(order MulchOrderType) (string, error) {
 	log.Println("Creating Order: ", order)
-	return order.OrderId
+
+	if 0 == len(order.OrderId) {
+		return "", errors.New("orderId must be provided for a new record")
+	}
+	if 0 == len(order.OwnerId) {
+		return "", errors.New("ownerId must be provided for a new record")
+	}
+	sqlFields, valIdxs, values := OrderType2Sql(order)
+
+	sqlCmd := fmt.Sprintf("insert into mulch_orders(%s) values (%s)",
+		strings.Join(sqlFields, ","), strings.Join(valIdxs, ","))
+
+	log.Println("Creating Order sqlCmd: ", sqlCmd)
+	_, err := Db.Exec(context.Background(), sqlCmd, values...)
+	if err != nil {
+		return "", err
+	}
+
+	return order.OrderId, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func UpdateMulchOrder(order MulchOrderType) string {
+func UpdateMulchOrder(order MulchOrderType) (bool, error) {
 	log.Println("Updating Order: ", order)
-	return order.OrderId
+
+	if 0 == len(order.OrderId) {
+		return false, errors.New("orderId must be provided for a new record")
+	}
+	sqlFields, valIdxs, values := OrderType2Sql(order)
+
+	updateSqlFields := []string{}
+	for i, sqlField := range sqlFields {
+		updateSqlFields = append(updateSqlFields, fmt.Sprintf("%s = %s", sqlField, valIdxs[i]))
+	}
+
+	updateSqlFields = updateSqlFields[1:] //Pop off Order id from the list
+	//values still has OrderId at pos 0 which is what we want so don't need to chop it off
+
+	sqlCmd := fmt.Sprintf("update mulch_orders set %s where order_id = $1", strings.Join(updateSqlFields, ","))
+
+	log.Println("Updating Order sqlCmd: ", sqlCmd)
+	_, err := Db.Exec(context.Background(), sqlCmd, values...)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func DeleteMulchOrder(orderId string) string {
-	log.Println("Deleteing OrderID: ", orderId)
-	return orderId
+func DeleteMulchOrder(orderId string) (bool, error) {
+	log.Println("Deleteing Order with order id: ", orderId)
+	_, err := Db.Exec(context.Background(), "delete from mulch_orders where order_id=$1", orderId)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////

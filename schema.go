@@ -200,12 +200,12 @@ func init() {
 
 			newMulchOrder := MulchOrderType{}
 			json.Unmarshal([]byte(jsonString), &newMulchOrder)
-			return CreateMulchOrder(newMulchOrder), nil
+			return CreateMulchOrder(newMulchOrder)
 		},
 	}
 
 	mutationFields["updateMulchOrder"] = &graphql.Field{
-		Type:        graphql.String,
+		Type:        graphql.Boolean,
 		Description: "Update order",
 		Args: graphql.FieldConfigArgument{
 			"order": &graphql.ArgumentConfig{
@@ -222,12 +222,12 @@ func init() {
 
 			updatedMulchOrder := MulchOrderType{}
 			json.Unmarshal([]byte(jsonString), &updatedMulchOrder)
-			return UpdateMulchOrder(updatedMulchOrder), nil
+			return UpdateMulchOrder(updatedMulchOrder)
 		},
 	}
 
 	mutationFields["deleteMulchOrder"] = &graphql.Field{
-		Type:        graphql.String,
+		Type:        graphql.Boolean,
 		Description: "Deletes order associated with orderId",
 		Args: graphql.FieldConfigArgument{
 			"orderId": &graphql.ArgumentConfig{
@@ -236,7 +236,7 @@ func init() {
 			},
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			return DeleteMulchOrder(p.Args["orderId"].(string)), nil
+			return DeleteMulchOrder(p.Args["orderId"].(string))
 		},
 	}
 
@@ -358,7 +358,7 @@ func init() {
 	mulchDeliveryConfigType := graphql.NewObject(graphql.ObjectConfig{
 		Name: "MulchDeliveryConfigType",
 		Fields: graphql.Fields{
-			"id":                 &graphql.Field{Type: graphql.String},
+			"id":                 &graphql.Field{Type: graphql.Int},
 			"date":               &graphql.Field{Type: graphql.String},
 			"newOrderCutoffDate": &graphql.Field{Type: graphql.String},
 		},
@@ -412,7 +412,7 @@ func init() {
 	mulchDeliveryInputConfigType := graphql.NewInputObject(graphql.InputObjectConfig{
 		Name: "MulchDeliveryInputConfigType",
 		Fields: graphql.InputObjectConfigFieldMap{
-			"id":                 &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"id":                 &graphql.InputObjectFieldConfig{Type: graphql.Int},
 			"date":               &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"newOrderCutoffDate": &graphql.InputObjectFieldConfig{Type: graphql.String},
 		},

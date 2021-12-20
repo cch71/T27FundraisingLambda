@@ -4,8 +4,10 @@ import (
 	"log"
 	"os"
 	"path"
+	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 )
 
@@ -91,12 +93,12 @@ mutation {
     ],
     mulchDeliveryConfigs: [
       {
-          id: "1",
+          id: 1,
           date: "3/13/2022",
           newOrderCutoffDate: "2/19/2022"
       },
       {
-          id: "2",
+          id: 2,
           date: "4/10/2022",
           newOrderCutoffDate: "3/27/2022"
       }
@@ -155,15 +157,32 @@ var timecardQueryGql2 = `
 }
 `
 
-var createMulchOrderGql = `
+var createMulchOrderGql1 = `
 mutation {
   createMulchOrder(order: {
-    orderId: "24"
+    orderId: "**UUID**"
     ownerId: "Blogger1"
+    willCollectMoneyLater: true
   })
 }
 `
 
+var updateMulchOrderGql1 = `
+mutation {
+  updateMulchOrder(order: {
+    orderId: "**UUID**"
+    ownerId: "Blogger1"
+    willCollectMoneyLater: false
+    amountFromDonationsCollected: "25.00"
+    amountTotalCollected: "25.00"
+  })
+}
+`
+var deleteMulchOrderGql1 = `
+mutation {
+  deleteMulchOrder(orderId: "**UUID**")
+}
+`
 var archivedOrderQueryGql1 = `
 {
   archivedMulchOrder(orderId: "04a4c1b4-6a6d-4e20-a09d-1dc28d7d5955") {
@@ -305,6 +324,35 @@ func TestGraphQLSummaryQuery(t *testing.T) {
 		rJSON, err := MakeGqlQuery(summaryQueryGql1)
 		if err != nil {
 			t.Fatal("GraphQL Query Failed: ", err)
+		}
+		t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
+	}
+}
+
+func TestGraphQLSummaryCreateUpdateAndDeleteOrder(t *testing.T) {
+	uuidStr := uuid.New().String()
+
+	{
+		gql := strings.ReplaceAll(createMulchOrderGql1, "**UUID**", uuidStr)
+		rJSON, err := MakeGqlQuery(gql)
+		if err != nil {
+			t.Fatal("GraphQL Create Order Failed: ", err)
+		}
+		t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
+	}
+	{
+		gql := strings.ReplaceAll(updateMulchOrderGql1, "**UUID**", uuidStr)
+		rJSON, err := MakeGqlQuery(gql)
+		if err != nil {
+			t.Fatal("GraphQL Update Order Failed: ", err)
+		}
+		t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
+	}
+	{
+		gql := strings.ReplaceAll(deleteMulchOrderGql1, "**UUID**", uuidStr)
+		rJSON, err := MakeGqlQuery(gql)
+		if err != nil {
+			t.Fatal("GraphQL Delete Order Failed: ", err)
 		}
 		t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
 	}
