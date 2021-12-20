@@ -11,6 +11,11 @@ import (
 
 var summaryQueryGql = `
 {
+  config {
+    kind
+    lastModifiedTime
+    isLocked
+  }
   summaryByOwnerId(ownerId: "Bob") {
   	totalDeliveryMinutes
   }
@@ -28,12 +33,13 @@ var summaryQueryGql = `
 }
 `
 
-var frConfigQueryGql = `
+var activeConfigQueryGql1 = `
 {
   config {
     description
     kind
     isLocked
+    lastModifiedTime
     neighborhoods {
       name
       distributionPoint
@@ -57,6 +63,62 @@ var frConfigQueryGql = `
 }
 `
 
+var setActiveConfigMutationGql = `
+mutation {
+  setConfig(config: {
+    kind: "mulch",
+    description: "Mulch",
+    isLocked: true,
+    neighborhoods: [
+      {
+         name: "Avery Ranch",
+         distributionPoint: "Walsh"
+      },{
+
+         name: "Behrens Ranch",
+         distributionPoint: "Walsh"
+      }
+    ],
+    mulchDeliveryConfigs: [
+      {
+          id: "1",
+          date: "3/13/2022",
+          newOrderCutoffDate: "2/19/2022"
+      },
+      {
+          id: "2",
+          date: "4/10/2022",
+          newOrderCutoffDate: "3/27/2022"
+      }
+    ],
+    products: [
+      {
+          id: "bags",
+          label: "Bags of Mulch",
+          unitPrice: "4.15",
+          minUnits: 5,
+          priceBreaks: [
+              {
+                  gt: 15,
+                  unitPrice: "4.00"
+              },{
+                  gt: 35,
+                  unitPrice: "3.85"
+              },{
+                  gt: 64,
+                  unitPrice: "3.75"
+              }
+          ]
+      },{
+          id: "spreading",
+          label: "Bags to Spread",
+          minUnits: 5,
+          unitPrice: "2.00"
+      }
+    ]
+  })
+}
+`
 var timecardQueryGql1 = `
 {
     mulchTimeCards(id: "axell") {
@@ -118,7 +180,7 @@ var archivedOrderQueryGql1 = `
 
 var archivedOrdersQueryGql1 = `
 {
-  archivedMulchOrders {
+  archivedMulchOrders(ownerId: "parvg") {
     orderId
     ownerId
     amountTotalCollected
@@ -188,7 +250,7 @@ func TestGraphQLTimeCards(t *testing.T) {
 	// }
 }
 
-func TestGraphQLArchivedOrder(t *testing.T) {
+func TestGraphQLArchivedSingleOrder(t *testing.T) {
 	{
 		rJSON, err := MakeGqlQuery(archivedOrderQueryGql1)
 		if err != nil {
@@ -198,9 +260,29 @@ func TestGraphQLArchivedOrder(t *testing.T) {
 	}
 }
 
-func TestGraphQLArchivedOrders(t *testing.T) {
+func TestGraphQLArchivedParvgOrders(t *testing.T) {
 	{
 		rJSON, err := MakeGqlQuery(archivedOrdersQueryGql1)
+		if err != nil {
+			t.Fatal("GraphQL Query Failed: ", err)
+		}
+		t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
+	}
+}
+
+func TestGraphQLSetActiveConfig(t *testing.T) {
+	{
+		rJSON, err := MakeGqlQuery(setActiveConfigMutationGql)
+		if err != nil {
+			t.Fatal("GraphQL Mutation Failed: ", err)
+		}
+		t.Logf("%s \n", rJSON)
+	}
+}
+
+func TestGraphQLActiveConfig(t *testing.T) {
+	{
+		rJSON, err := MakeGqlQuery(activeConfigQueryGql1)
 		if err != nil {
 			t.Fatal("GraphQL Query Failed: ", err)
 		}

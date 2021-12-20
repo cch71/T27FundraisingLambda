@@ -13,6 +13,7 @@ var (
 	FrSchema graphql.Schema
 )
 
+////////////////////////////////////////////////////////////////////////////
 // Function for retrieving selected fields
 func getSelectedFields(selectionPath []string, resolveParams graphql.ResolveParams) []string {
 	fields := resolveParams.Info.FieldASTs
@@ -41,6 +42,8 @@ func getSelectedFields(selectionPath []string, resolveParams graphql.ResolvePara
 	return collect
 }
 
+////////////////////////////////////////////////////////////////////////////
+//
 func init() {
 
 	queryFields := make(map[string]*graphql.Field)
@@ -105,7 +108,7 @@ func init() {
 			"customer":                     &graphql.Field{Type: customerType},
 			"purchases":                    &graphql.Field{Type: mulchProductType},
 			"spreaders":                    &graphql.Field{Type: graphql.NewList(graphql.String)},
-			"deliveryId":                   &graphql.Field{Type: graphql.String},
+			"deliveryId":                   &graphql.Field{Type: graphql.Int},
 		},
 	})
 	archivedMulchOrderType := graphql.NewObject(graphql.ObjectConfig{
@@ -172,7 +175,7 @@ func init() {
 			"customer":                     &graphql.InputObjectFieldConfig{Type: customerInputType},
 			"purchases":                    &graphql.InputObjectFieldConfig{Type: mulchProductInputType},
 			"spreaders":                    &graphql.InputObjectFieldConfig{Type: graphql.NewList(graphql.String)},
-			"deliveryId":                   &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"deliveryId":                   &graphql.InputObjectFieldConfig{Type: graphql.Int},
 		},
 	})
 
@@ -390,35 +393,87 @@ func init() {
 		Fields: graphql.Fields{
 			"kind":                 &graphql.Field{Type: graphql.String},
 			"description":          &graphql.Field{Type: graphql.String},
+			"lastModifiedTime":     &graphql.Field{Type: graphql.String},
+			"isLocked":             &graphql.Field{Type: graphql.Boolean},
 			"mulchDeliveryConfigs": &graphql.Field{Type: graphql.NewList(mulchDeliveryConfigType)},
 			"products":             &graphql.Field{Type: graphql.NewList(productConfigType)},
-			"isLocked":             &graphql.Field{Type: graphql.Boolean},
-			"neighborhoods": &graphql.Field{
-				Type: graphql.NewList(neighborhoodConfigType),
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					type NeighborhoodItem struct {
-						Name              string
-						DistributionPoint string
-					}
-					hoodList := []NeighborhoodItem{}
-					theHoods := p.Source.(FrConfigType).Neighborhoods
-					for name, obj := range theHoods {
-						hoodList = append(hoodList,
-							NeighborhoodItem{
-								Name:              name,
-								DistributionPoint: obj.DistributionPoint,
-							})
-					}
-					return hoodList, nil
-				},
-			},
+			"neighborhoods":        &graphql.Field{Type: graphql.NewList(neighborhoodConfigType)},
 		},
 	})
 	queryFields["config"] = &graphql.Field{
 		Type:        configType,
 		Description: "Queries for Summary information based on Owner ID",
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			return GetFundraisingConfig()
+			gqlFields := getSelectedFields([]string{"config"}, p)
+			return GetFundraiserConfig(gqlFields)
+		},
+	}
+
+	mulchDeliveryInputConfigType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: "MulchDeliveryInputConfigType",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"id":                 &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"date":               &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"newOrderCutoffDate": &graphql.InputObjectFieldConfig{Type: graphql.String},
+		},
+	})
+	neighborhoodInputConfigType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: "NeighborhoodInputConfigType",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"name":              &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"distributionPoint": &graphql.InputObjectFieldConfig{Type: graphql.String},
+		},
+	})
+	productPriceBreakInputConfigType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: "ProductPriceBreakInputConfigType",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"gt":        &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"unitPrice": &graphql.InputObjectFieldConfig{Type: graphql.String},
+		},
+	})
+	productInputConfigType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: "ProductInputConfigType",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"id":          &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"label":       &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"minUnits":    &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"unitPrice":   &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"priceBreaks": &graphql.InputObjectFieldConfig{Type: graphql.NewList(productPriceBreakInputConfigType)},
+		},
+	})
+	configInputType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name:        "ConfigType",
+		Description: "Fundraiser config inforamation",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"kind":                 &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"description":          &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"lastModifiedTime":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"isLocked":             &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
+			"mulchDeliveryConfigs": &graphql.InputObjectFieldConfig{Type: graphql.NewList(mulchDeliveryInputConfigType)},
+			"products":             &graphql.InputObjectFieldConfig{Type: graphql.NewList(productInputConfigType)},
+			"neighborhoods":        &graphql.InputObjectFieldConfig{Type: graphql.NewList(neighborhoodInputConfigType)},
+		},
+	})
+	mutationFields["setConfig"] = &graphql.Field{
+		Type:        graphql.Boolean,
+		Description: "SetConfig",
+		Args: graphql.FieldConfigArgument{
+			"config": &graphql.ArgumentConfig{
+				Description: "The config entry",
+				Type:        configInputType,
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// log.Println("Setting Config: ", p.Args["config"])
+			jsonString, err := json.Marshal(p.Args["config"])
+			if err != nil {
+				fmt.Println("Error encoding JSON")
+				return nil, nil
+			}
+
+			frConfig := FrConfigType{}
+			json.Unmarshal([]byte(jsonString), &frConfig)
+			return SetFundraiserConfig(frConfig)
 		},
 	}
 
@@ -518,6 +573,8 @@ func init() {
 	FrSchema, _ = graphql.NewSchema(schemaConfig)
 }
 
+////////////////////////////////////////////////////////////////////////////
+//
 func MakeGqlQuery(gql string) ([]byte, error) {
 	params := graphql.Params{Schema: FrSchema, RequestString: gql}
 	r := graphql.Do(params)
