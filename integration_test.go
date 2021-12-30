@@ -162,8 +162,50 @@ mutation {
   createMulchOrder(order: {
     orderId: "**UUID**"
     ownerId: "Blogger1"
+    customer: {
+        name: "John Ford"
+        addr1: "123 Hola Gato Dr"
+        addr2: "Apt 4c"
+        phone: "211-234-5434"
+        email: "my@noreply.com"
+        neighborhood: "Brown Bear"
+    }
     willCollectMoneyLater: true
+    deliveryId: 2
+    purchases: [{
+        productId: "bags"
+        numSold: 24
+        amountCharged: "200.00"
+    }]
+    amountFromPurchases: "200.00"
   })
+}
+`
+var queryOrdersGql1 = `
+{
+  mulchOrders(ownerId: "Blogger1") {
+    orderId
+    ownerId
+    amountFromPurchases
+    amountFromDonations
+    amountTotalCollected
+    willCollectMoneyLater
+    isVerified
+    customer {
+        name
+        addr1
+        addr2
+        phone
+        email
+        neighborhood
+    }
+    specialInstructions
+    purchases {
+        productId
+        numSold
+        amountCharged
+    }
+  }
 }
 `
 
@@ -172,8 +214,18 @@ mutation {
   updateMulchOrder(order: {
     orderId: "**UUID**"
     ownerId: "Blogger1"
+    customer: {
+        name: "John Ford"
+        addr1: "123 Hola Gato Dr"
+        phone: "211-234-5434"
+        neighborhood: "Brown Bear"
+    }
+    specialInstructions: "Don't leave it where I can see it"
     willCollectMoneyLater: false
-    amountFromDonationsCollected: "25.00"
+    amountFromDonations: "25.00"
+    amountFromCashCollected: "20.00"
+    amountFromChecksCollected: "5.00"
+    checkNumbers: "1234 1235"
     amountTotalCollected: "25.00"
   })
 }
@@ -198,10 +250,9 @@ var archivedOrderQueryGql1 = `
         neighborhood
     }
     purchases {
-        bagsSold
-        bagsToSpread
-        amountChargedForBags
-        amountChargedForSpreading
+        productId
+        numSold
+        amountCharged
     }
   }
 }
@@ -223,10 +274,9 @@ var archivedOrdersQueryGql1 = `
         neighborhood
     }
     purchases {
-        bagsSold
-        bagsToSpread
-        amountChargedForBags
-        amountChargedForSpreading
+        productId
+        numSold
+        amountCharged
     }
   }
 }
@@ -246,7 +296,7 @@ var archivedOrdersQueryGql1 = `
 
 func TestMain(m *testing.M) {
 	// Write code here to run before tests
-	credentialsFile := path.Join(os.Getenv("HOME"), ".cockroachdb", "credentials.yml")
+	credentialsFile := path.Join(os.Getenv("HOME"), ".cockroachdb", "credentials")
 	_ = godotenv.Load(credentialsFile)
 	if err := InitDb(); err != nil {
 		log.Fatal("Failed to initialize db:", err)
@@ -338,7 +388,15 @@ func TestGraphQLSummaryCreateUpdateAndDeleteOrder(t *testing.T) {
 		if err != nil {
 			t.Fatal("GraphQL Create Order Failed: ", err)
 		}
-		t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
+		t.Logf("%s \n\n", rJSON)
+	}
+	{
+		gql := strings.ReplaceAll(queryOrdersGql1, "**UUID**", uuidStr)
+		rJSON, err := MakeGqlQuery(gql)
+		if err != nil {
+			t.Fatal("GraphQL Query1 Failed: ", err)
+		}
+		t.Logf("\n%s \n\n", rJSON)
 	}
 	{
 		gql := strings.ReplaceAll(updateMulchOrderGql1, "**UUID**", uuidStr)
@@ -346,7 +404,15 @@ func TestGraphQLSummaryCreateUpdateAndDeleteOrder(t *testing.T) {
 		if err != nil {
 			t.Fatal("GraphQL Update Order Failed: ", err)
 		}
-		t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
+		t.Logf("\n%s \n\n", rJSON)
+	}
+	{
+		gql := strings.ReplaceAll(queryOrdersGql1, "**UUID**", uuidStr)
+		rJSON, err := MakeGqlQuery(gql)
+		if err != nil {
+			t.Fatal("GraphQL Query2 Failed: ", err)
+		}
+		t.Logf("\n%s \n\n", rJSON)
 	}
 	{
 		gql := strings.ReplaceAll(deleteMulchOrderGql1, "**UUID**", uuidStr)
@@ -354,6 +420,6 @@ func TestGraphQLSummaryCreateUpdateAndDeleteOrder(t *testing.T) {
 		if err != nil {
 			t.Fatal("GraphQL Delete Order Failed: ", err)
 		}
-		t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
+		t.Logf("\n%s \n\n", rJSON)
 	}
 }

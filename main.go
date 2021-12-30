@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/graphql-go/graphql"
 )
 
 // var invokeCount = 0
@@ -19,16 +21,38 @@ import (
 //         myObjects = result.Contents
 // }
 
+////////////////////////////////////////////////////////////////////////////
+//
+func MakeGqlQuery(gql string) ([]byte, error) {
+	params := graphql.Params{Schema: FrSchema, RequestString: gql}
+	r := graphql.Do(params)
+	if len(r.Errors) > 0 {
+		log.Printf("failed to execute graphql operation, errors: %+v", r.Errors)
+	}
+	rJSON, err := json.Marshal(r)
+	if err != nil {
+		log.Println("Error encoding JSON results: ", err, " for gql: ", gql)
+		return nil, err
+	}
+	return rJSON, nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
 type LambdaRequest struct {
 	GraphQL string `json:"gql"`
 }
 
+////////////////////////////////////////////////////////////////////////////
+//
 type LambdaResponse struct {
 	Body       string            `json:"body"`
 	StatusCode int               `json:"statusCode"`
 	Headers    map[string]string `json:"headers"`
 }
 
+////////////////////////////////////////////////////////////////////////////
+//
 func generateResp(body string, statusCode int) LambdaResponse {
 	return LambdaResponse{
 		StatusCode: statusCode,
@@ -41,10 +65,15 @@ func generateResp(body string, statusCode int) LambdaResponse {
 	}
 
 }
+
+////////////////////////////////////////////////////////////////////////////
+//
 func generateOkResp(body string) LambdaResponse {
 	return generateResp(body, http.StatusOK)
 }
 
+////////////////////////////////////////////////////////////////////////////
+//
 func HandleLambdaEvent(_ctx context.Context, event LambdaRequest) (LambdaResponse, error) {
 	//if dbconn not already established then RwLock to go ahead and try once sync.Once
 	//check authorization
@@ -64,6 +93,8 @@ func HandleLambdaEvent(_ctx context.Context, event LambdaRequest) (LambdaRespons
 	return generateOkResp(string(respBody)), nil
 }
 
+////////////////////////////////////////////////////////////////////////////
+//
 func main() {
 	lambda.Start(HandleLambdaEvent)
 	if Db != nil {

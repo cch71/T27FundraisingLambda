@@ -133,43 +133,41 @@ func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
 ////////////////////////////////////////////////////////////////////////////
 //
 type CustomerType struct {
-	Addr1        string
-	Addr2        string
-	Phone        string
-	Email        string
-	Neighborhood string
 	Name         string
+	Addr1        string
+	Addr2        *string
+	Phone        string
+	Email        *string
+	Neighborhood string
 }
 
 ////////////////////////////////////////////////////////////////////////////
 //
-type MulchProductsType struct {
-	// Bags                      int // legacy
-	//Spreading                 int // legacy
-	BagsSold                  int    `json:"bags,omitempty" json:"bagsSold"`
-	BagsToSpread              int    `json:"spreading,omitempty" json:"bagsToSpread"`
-	AmountChargedForBags      string `json:"amountChargedForBags,omitempty"`
-	AmountChargedForSpreading string `json:"amountChargedForSpreading,omitempty"`
+type ProductsType struct {
+	ProductId     string `json:"productId"`
+	NumSold       int    `json:"numSold"`
+	AmountCharged string `json:"amountCharged,omitempty"`
 }
 
 ////////////////////////////////////////////////////////////////////////////
 //
 type MulchOrderType struct {
-	OrderId                      string
-	OwnerId                      string
-	LastModifiedTime             string
-	SpecialInstructions          string
-	AmountFromDonationsCollected string
-	AmountFromCashCollected      string
-	AmountFromChecksCollected    string
-	AmountTotalCollected         string
-	CheckNumbers                 []string
-	WillCollectMoneyLater        *bool
-	IsVerified                   *bool
-	Customer                     CustomerType
-	Purchases                    MulchProductsType
-	DeliveryId                   *int   // Not in archived GraphQL
-	YearOrdered                  string // Not in non archived GraphQL
+	OrderId                   string
+	OwnerId                   string
+	LastModifiedTime          string
+	SpecialInstructions       *string
+	AmountFromDonations       *string
+	AmountFromPurchases       *string
+	AmountFromCashCollected   *string
+	AmountFromChecksCollected *string
+	AmountTotalCollected      *string
+	CheckNumbers              *string
+	WillCollectMoneyLater     *bool
+	IsVerified                *bool
+	Customer                  CustomerType
+	Purchases                 []ProductsType
+	DeliveryId                *int   // Not in archived GraphQL
+	YearOrdered               string // Not in non archived GraphQL
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -211,9 +209,12 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 		case gqlField == "specialInstructions":
 			inputs = append(inputs, &orderOutput.SpecialInstructions)
 			sqlFields = append(sqlFields, "special_instructions")
-		case gqlField == "amountFromDonationsCollected":
-			inputs = append(inputs, &orderOutput.AmountFromDonationsCollected)
-			sqlFields = append(sqlFields, "donation_amount_collected::string")
+		case gqlField == "amountFromDonations":
+			inputs = append(inputs, &orderOutput.AmountFromDonations)
+			sqlFields = append(sqlFields, "amount_from_donations::string")
+		case gqlField == "amountFromPurchases":
+			inputs = append(inputs, &orderOutput.AmountFromPurchases)
+			sqlFields = append(sqlFields, "amount_from_purchases::string")
 		case gqlField == "amountFromCashCollected":
 			inputs = append(inputs, &orderOutput.AmountFromCashCollected)
 			sqlFields = append(sqlFields, "cash_amount_collected::string")
@@ -222,7 +223,7 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 			sqlFields = append(sqlFields, "check_amount_collected::string")
 		case gqlField == "checkNumbers":
 			inputs = append(inputs, &orderOutput.CheckNumbers)
-			sqlFields = append(sqlFields, "check_numbers::jsonb")
+			sqlFields = append(sqlFields, "check_numbers::string")
 		case gqlField == "deliveryId":
 			inputs = append(inputs, &orderOutput.DeliveryId)
 			sqlFields = append(sqlFields, "delivery_id")
@@ -365,47 +366,52 @@ func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
 		valIdx++
 	}
-
-	if len(order.AmountTotalCollected) != 0 {
-		sqlFields = append(sqlFields, "total_amount_collected")
-		values = append(values, order.AmountTotalCollected)
-		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
-		valIdx++
-	}
-	if 0 != order.Purchases.BagsSold || 0 != order.Purchases.BagsToSpread {
+	if len(order.Purchases) != 0 {
 		sqlFields = append(sqlFields, "purchases")
 		values = append(values, order.Purchases)
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::jsonb", valIdx))
 		valIdx++
 	}
-	if len(order.SpecialInstructions) != 0 {
+	if nil != order.SpecialInstructions {
 		sqlFields = append(sqlFields, "special_instructions")
-		values = append(values, order.SpecialInstructions)
+		values = append(values, *order.SpecialInstructions)
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
 		valIdx++
 	}
-	if len(order.AmountFromDonationsCollected) != 0 {
-		sqlFields = append(sqlFields, "donation_amount_collected")
-		values = append(values, order.AmountFromDonationsCollected)
+	if nil != order.AmountFromDonations {
+		sqlFields = append(sqlFields, "amount_from_donations")
+		values = append(values, *order.AmountFromDonations)
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
 		valIdx++
 	}
-	if len(order.AmountFromCashCollected) != 0 {
+	if nil != order.AmountFromPurchases {
+		sqlFields = append(sqlFields, "amount_from_purchases")
+		values = append(values, *order.AmountFromPurchases)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
+		valIdx++
+	}
+	if nil != order.AmountFromCashCollected {
 		sqlFields = append(sqlFields, "cash_amount_collected")
-		values = append(values, order.AmountFromCashCollected)
+		values = append(values, *order.AmountFromCashCollected)
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
 		valIdx++
 	}
-	if len(order.AmountFromChecksCollected) != 0 {
+	if nil != order.AmountFromChecksCollected {
 		sqlFields = append(sqlFields, "check_amount_collected")
-		values = append(values, order.AmountFromChecksCollected)
+		values = append(values, *order.AmountFromChecksCollected)
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
 		valIdx++
 	}
-	if len(order.CheckNumbers) != 0 {
+	if nil != order.AmountTotalCollected {
+		sqlFields = append(sqlFields, "total_amount_collected")
+		values = append(values, *order.AmountTotalCollected)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
+		valIdx++
+	}
+	if nil != order.CheckNumbers {
 		sqlFields = append(sqlFields, "check_numbers")
-		values = append(values, order.CheckNumbers)
-		valIdxs = append(valIdxs, fmt.Sprintf("$%d::jsonb", valIdx))
+		values = append(values, *order.CheckNumbers)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
 		valIdx++
 	}
 	if nil != order.DeliveryId {
@@ -438,9 +444,9 @@ func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
 		valIdx++
 	}
-	if len(order.Customer.Addr2) != 0 {
+	if nil != order.Customer.Addr2 {
 		sqlFields = append(sqlFields, "customer_addr2")
-		values = append(values, order.Customer.Addr2)
+		values = append(values, *order.Customer.Addr2)
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
 		valIdx++
 	}
@@ -450,9 +456,9 @@ func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
 		valIdx++
 	}
-	if len(order.Customer.Email) != 0 {
+	if nil != order.Customer.Email {
 		sqlFields = append(sqlFields, "customer_email")
-		values = append(values, order.Customer.Email)
+		values = append(values, *order.Customer.Email)
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
 		valIdx++
 	}
@@ -497,27 +503,68 @@ func UpdateMulchOrder(order MulchOrderType) (bool, error) {
 	log.Println("Updating Order: ", order)
 
 	if 0 == len(order.OrderId) {
-		return false, errors.New("orderId must be provided for a new record")
+		return false, errors.New("orderId must be provided for updated record")
 	}
+	if 0 == len(order.OwnerId) {
+		return false, errors.New("ownerId must be provided for updated record")
+	}
+	//This was actually only updating the specified fields not updating the optional ones so changing to
+	// delete existing record and adding new one
+	/*
+			sqlFields, valIdxs, values := OrderType2Sql(order)
+
+			updateSqlFields := []string{}
+			for i, sqlField := range sqlFields {
+				updateSqlFields = append(updateSqlFields, fmt.Sprintf("%s = %s", sqlField, valIdxs[i]))
+			}
+
+			updateSqlFields = updateSqlFields[1:] //Pop off Order id from the list
+			//values still has OrderId at pos 0 which is what we want so don't need to chop it off
+
+			sqlCmd := fmt.Sprintf("update mulch_orders set %s where order_id = $1", strings.Join(updateSqlFields, ","))
+
+			log.Println("Updating Order sqlCmd: ", sqlCmd)
+			res, err := Db.Exec(context.Background(), sqlCmd, values...)
+			if err != nil {
+				return false, err
+			}
+			if 1 != res.RowsAffected() {
+				return false, errors.New("There were 0 records updated")
+			}
+
+		        return true, nil
+	*/
+
 	sqlFields, valIdxs, values := OrderType2Sql(order)
 
-	updateSqlFields := []string{}
-	for i, sqlField := range sqlFields {
-		updateSqlFields = append(updateSqlFields, fmt.Sprintf("%s = %s", sqlField, valIdxs[i]))
-	}
+	sqlCmd := fmt.Sprintf("insert into mulch_orders(%s) values (%s)",
+		strings.Join(sqlFields, ","), strings.Join(valIdxs, ","))
 
-	updateSqlFields = updateSqlFields[1:] //Pop off Order id from the list
-	//values still has OrderId at pos 0 which is what we want so don't need to chop it off
-
-	sqlCmd := fmt.Sprintf("update mulch_orders set %s where order_id = $1", strings.Join(updateSqlFields, ","))
-
-	log.Println("Updating Order sqlCmd: ", sqlCmd)
-	_, err := Db.Exec(context.Background(), sqlCmd, values...)
+	// Start Database Operations
+	trxn, err := Db.Begin(context.Background())
 	if err != nil {
 		return false, err
 	}
 
+	log.Println("Deleting order for update: ", order.OrderId)
+	_, err = trxn.Exec(context.Background(), "delete from mulch_orders where order_id = $1", order.OrderId)
+	if err != nil {
+		log.Println("Failed to delete order for updating. record may not exist: ", order.OrderId)
+		//return false, err
+	}
+	log.Println("Updating(by inserting) Order sqlCmd: ", sqlCmd)
+	_, err = trxn.Exec(context.Background(), sqlCmd, values...)
+	if err != nil {
+		return false, err
+	}
+
+	log.Println("About to make a commitment")
+	err = trxn.Commit(context.Background())
+	if err != nil {
+		return false, err
+	}
 	return true, nil
+
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -685,6 +732,9 @@ func SetFundraiserConfig(frConfig FrConfigType) (bool, error) {
 
 	// Start Database Operations
 	trxn, err := Db.Begin(context.Background())
+	if err != nil {
+		return false, err
+	}
 
 	log.Println("Deleting existing record")
 	_, err = trxn.Exec(context.Background(), "delete from fundraiser_config")

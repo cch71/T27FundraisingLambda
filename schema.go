@@ -79,14 +79,13 @@ func init() {
 		},
 	})
 
-	mulchProductType := graphql.NewObject(graphql.ObjectConfig{
-		Name:        "MulchProductType",
-		Description: "Mulch Products Record Type",
+	productType := graphql.NewObject(graphql.ObjectConfig{
+		Name:        "ProductType",
+		Description: "Products Record Type",
 		Fields: graphql.Fields{
-			"bagsSold":                  &graphql.Field{Type: graphql.Int},
-			"bagsToSpread":              &graphql.Field{Type: graphql.Int},
-			"amountChargedForBags":      &graphql.Field{Type: graphql.String},
-			"amountChargedForSpreading": &graphql.Field{Type: graphql.String},
+			"productId":     &graphql.Field{Type: graphql.String},
+			"numSold":       &graphql.Field{Type: graphql.Int},
+			"amountCharged": &graphql.Field{Type: graphql.String},
 		},
 	})
 
@@ -94,42 +93,44 @@ func init() {
 		Name:        "MulchOrderType",
 		Description: "Mulch Order Record Type",
 		Fields: graphql.Fields{
-			"orderId":                      &graphql.Field{Type: graphql.String},
-			"ownerId":                      &graphql.Field{Type: graphql.String},
-			"lastModifiedTime":             &graphql.Field{Type: graphql.String},
-			"specialInstructions":          &graphql.Field{Type: graphql.String},
-			"amountFromDonationsCollected": &graphql.Field{Type: graphql.String},
-			"amountFromCashCollected":      &graphql.Field{Type: graphql.String},
-			"amountFromChecksCollected":    &graphql.Field{Type: graphql.String},
-			"amountTotalCollected":         &graphql.Field{Type: graphql.String},
-			"checkNumbers":                 &graphql.Field{Type: graphql.NewList(graphql.String)},
-			"willCollectMoneyLater":        &graphql.Field{Type: graphql.Boolean},
-			"isVerified":                   &graphql.Field{Type: graphql.Boolean},
-			"customer":                     &graphql.Field{Type: customerType},
-			"purchases":                    &graphql.Field{Type: mulchProductType},
-			"spreaders":                    &graphql.Field{Type: graphql.NewList(graphql.String)},
-			"deliveryId":                   &graphql.Field{Type: graphql.Int},
+			"orderId":                   &graphql.Field{Type: graphql.String},
+			"ownerId":                   &graphql.Field{Type: graphql.String},
+			"lastModifiedTime":          &graphql.Field{Type: graphql.String},
+			"specialInstructions":       &graphql.Field{Type: graphql.String},
+			"amountFromDonations":       &graphql.Field{Type: graphql.String},
+			"amountFromPurchases":       &graphql.Field{Type: graphql.String},
+			"amountFromCashCollected":   &graphql.Field{Type: graphql.String},
+			"amountFromChecksCollected": &graphql.Field{Type: graphql.String},
+			"amountTotalCollected":      &graphql.Field{Type: graphql.String},
+			"checkNumbers":              &graphql.Field{Type: graphql.String},
+			"willCollectMoneyLater":     &graphql.Field{Type: graphql.Boolean},
+			"isVerified":                &graphql.Field{Type: graphql.Boolean},
+			"customer":                  &graphql.Field{Type: customerType},
+			"purchases":                 &graphql.Field{Type: graphql.NewList(productType)},
+			"spreaders":                 &graphql.Field{Type: graphql.NewList(graphql.String)},
+			"deliveryId":                &graphql.Field{Type: graphql.Int},
 		},
 	})
 	archivedMulchOrderType := graphql.NewObject(graphql.ObjectConfig{
 		Name:        "ArchivedMulchOrderType",
 		Description: "Archive Mulch Order Record Type",
 		Fields: graphql.Fields{
-			"orderId":                      &graphql.Field{Type: graphql.String},
-			"ownerId":                      &graphql.Field{Type: graphql.String},
-			"lastModifiedTime":             &graphql.Field{Type: graphql.String},
-			"specialInstructions":          &graphql.Field{Type: graphql.String},
-			"amountFromDonationsCollected": &graphql.Field{Type: graphql.String},
-			"amountFromCashCollected":      &graphql.Field{Type: graphql.String},
-			"amountFromChecksCollected":    &graphql.Field{Type: graphql.String},
-			"amountTotalCollected":         &graphql.Field{Type: graphql.String},
-			"checkNumbers":                 &graphql.Field{Type: graphql.NewList(graphql.String)},
-			"willCollectMoneyLater":        &graphql.Field{Type: graphql.Boolean},
-			"isVerified":                   &graphql.Field{Type: graphql.Boolean},
-			"customer":                     &graphql.Field{Type: customerType},
-			"purchases":                    &graphql.Field{Type: mulchProductType},
-			"spreaders":                    &graphql.Field{Type: graphql.NewList(graphql.String)},
-			"yearOrdered":                  &graphql.Field{Type: graphql.String},
+			"orderId":                   &graphql.Field{Type: graphql.String},
+			"ownerId":                   &graphql.Field{Type: graphql.String},
+			"lastModifiedTime":          &graphql.Field{Type: graphql.String},
+			"specialInstructions":       &graphql.Field{Type: graphql.String},
+			"amountFromDonations":       &graphql.Field{Type: graphql.String},
+			"amountFromPurchases":       &graphql.Field{Type: graphql.String},
+			"amountFromCashCollected":   &graphql.Field{Type: graphql.String},
+			"amountFromChecksCollected": &graphql.Field{Type: graphql.String},
+			"amountTotalCollected":      &graphql.Field{Type: graphql.String},
+			"checkNumbers":              &graphql.Field{Type: graphql.String},
+			"willCollectMoneyLater":     &graphql.Field{Type: graphql.Boolean},
+			"isVerified":                &graphql.Field{Type: graphql.Boolean},
+			"customer":                  &graphql.Field{Type: customerType},
+			"purchases":                 &graphql.Field{Type: graphql.NewList(productType)},
+			"spreaders":                 &graphql.Field{Type: graphql.NewList(graphql.String)},
+			"yearOrdered":               &graphql.Field{Type: graphql.String},
 		},
 	})
 
@@ -146,14 +147,13 @@ func init() {
 		},
 	})
 
-	mulchProductInputType := graphql.NewInputObject(graphql.InputObjectConfig{
-		Name:        "MulchProductInputType",
-		Description: "Mulch Products Input Record Type",
+	productInputType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name:        "ProductInputType",
+		Description: "Products Input Record Type",
 		Fields: graphql.InputObjectConfigFieldMap{
-			"bagsSold":                  &graphql.InputObjectFieldConfig{Type: graphql.Int},
-			"bagsToSpread":              &graphql.InputObjectFieldConfig{Type: graphql.Int},
-			"AmountChargedForBags":      &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"AmountChargedForSpreading": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"productId":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"numSold":       &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"amountCharged": &graphql.InputObjectFieldConfig{Type: graphql.String},
 		},
 	})
 
@@ -161,21 +161,21 @@ func init() {
 		Name:        "MulchOrderInputType",
 		Description: "Mulch Order Input Record Type",
 		Fields: graphql.InputObjectConfigFieldMap{
-			"orderId":                      &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"ownerId":                      &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"lastModifiedTime":             &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"specialInstructions":          &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"amountFromDonationsCollected": &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"amountFromCashCollected":      &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"amountFromChecksCollected":    &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"amountTotalCollected":         &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"checkNumbers":                 &graphql.InputObjectFieldConfig{Type: graphql.NewList(graphql.String)},
-			"willCollectMoneyLater":        &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
-			"isVerified":                   &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
-			"customer":                     &graphql.InputObjectFieldConfig{Type: customerInputType},
-			"purchases":                    &graphql.InputObjectFieldConfig{Type: mulchProductInputType},
-			"spreaders":                    &graphql.InputObjectFieldConfig{Type: graphql.NewList(graphql.String)},
-			"deliveryId":                   &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"orderId":                   &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"ownerId":                   &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"specialInstructions":       &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"amountFromDonations":       &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"amountFromPurchases":       &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"amountFromCashCollected":   &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"amountFromChecksCollected": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"amountTotalCollected":      &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"checkNumbers":              &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"willCollectMoneyLater":     &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
+			"isVerified":                &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
+			"customer":                  &graphql.InputObjectFieldConfig{Type: customerInputType},
+			"purchases":                 &graphql.InputObjectFieldConfig{Type: graphql.NewList(productInputType)},
+			"spreaders":                 &graphql.InputObjectFieldConfig{Type: graphql.NewList(graphql.String)},
+			"deliveryId":                &graphql.InputObjectFieldConfig{Type: graphql.Int},
 		},
 	})
 
@@ -563,20 +563,4 @@ func init() {
 	}
 
 	FrSchema, _ = graphql.NewSchema(schemaConfig)
-}
-
-////////////////////////////////////////////////////////////////////////////
-//
-func MakeGqlQuery(gql string) ([]byte, error) {
-	params := graphql.Params{Schema: FrSchema, RequestString: gql}
-	r := graphql.Do(params)
-	if len(r.Errors) > 0 {
-		log.Printf("failed to execute graphql operation, errors: %+v", r.Errors)
-	}
-	rJSON, err := json.Marshal(r)
-	if err != nil {
-		log.Println("Error encoding JSON results: ", err, " for gql: ", gql)
-		return nil, err
-	}
-	return rJSON, nil
 }
