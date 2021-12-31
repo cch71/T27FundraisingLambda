@@ -581,7 +581,7 @@ func DeleteMulchOrder(orderId string) (bool, error) {
 ////////////////////////////////////////////////////////////////////////////
 //
 type MulchDeliveryConfigType struct {
-	Id                 string `json:"id"`
+	Id                 int    `json:"id"`
 	Date               string `json:"date"`
 	NewOrderCutoffDate string `json:"newOrderCutoffDate"`
 }
@@ -590,7 +590,7 @@ type MulchDeliveryConfigType struct {
 //
 type NeighborhoodsType struct {
 	Name              string `json: name`
-	DistributionPoint string `json:"distributionPt"`
+	DistributionPoint string `json:"distributionPoint"`
 }
 
 ////////////////////////////////////////////////////////////////////////////

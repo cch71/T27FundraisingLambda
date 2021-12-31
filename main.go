@@ -39,8 +39,14 @@ func MakeGqlQuery(gql string) ([]byte, error) {
 
 ////////////////////////////////////////////////////////////////////////////
 //
+type LambdaRequestBody struct {
+	Query string `json:"query"`
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
 type LambdaRequest struct {
-	GraphQL string `json:"gql"`
+	Body string `json:"body"`
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -83,8 +89,12 @@ func HandleLambdaEvent(_ctx context.Context, event LambdaRequest) (LambdaRespons
 		log.Println("Failed to initialize db:", err)
 		return generateResp("", http.StatusInternalServerError), err
 	}
+	log.Println("Rxed GraphQL Query: ", event)
 
-	respBody, err := MakeGqlQuery(event.GraphQL)
+	body := LambdaRequestBody{}
+	json.Unmarshal([]byte(event.Body), &body)
+
+	respBody, err := MakeGqlQuery(body.Query)
 	if err != nil {
 		log.Println("GraphQL Query Failed: ", err)
 		return generateResp("", http.StatusBadRequest), err

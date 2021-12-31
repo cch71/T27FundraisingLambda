@@ -31,33 +31,36 @@ install-dev:
 test:
 		go test ./... --cover
 
-configure:
-		aws s3api create-bucket \
-			--bucket $(AWS_BUCKET_NAME) \
-			--region $(AWS_REGION) \
-			--create-bucket-configuration LocationConstraint=$(AWS_REGION)
+deploy: dist
+		aws lambda update-function-code --function-name ${GQL_LAMBDA_FUNCTION_NAME} --zip-file fileb://${PWD}/dist/function.zip
 
-package: build
-		@aws cloudformation package \
-			--template-file template.yml \
-			--s3-bucket $(AWS_BUCKET_NAME) \
-		--region $(AWS_REGION) \
-			--output-template-file package.yml
-
-deploy:
-		@aws cloudformation deploy \
-			--template-file package.yml \
-			--region $(AWS_REGION) \
-			--capabilities CAPABILITY_IAM \
-			--stack-name $(AWS_STACK_NAME)
-
-describe:
-		@aws cloudformation describe-stacks \
-			--region $(AWS_REGION) \
-			--stack-name $(AWS_STACK_NAME) \
-
-outputs:
-		@make describe | jq -r '.Stacks[0].Outputs'
-
-url:
-		@make describe | jq -r ".Stacks[0].Outputs[0].OutputValue" -j	
+# configure:
+# 		aws s3api create-bucket \
+# 			--bucket $(AWS_BUCKET_NAME) \
+# 			--region $(AWS_REGION) \
+# 			--create-bucket-configuration LocationConstraint=$(AWS_REGION)
+# 
+# package: build
+# 		@aws cloudformation package \
+# 			--template-file template.yml \
+# 			--s3-bucket $(AWS_BUCKET_NAME) \
+# 		--region $(AWS_REGION) \
+# 			--output-template-file package.yml
+# 
+# deploy:
+# 		@aws cloudformation deploy \
+# 			--template-file package.yml \
+# 			--region $(AWS_REGION) \
+# 			--capabilities CAPABILITY_IAM \
+# 			--stack-name $(AWS_STACK_NAME)
+# 
+# describe:
+# 		@aws cloudformation describe-stacks \
+# 			--region $(AWS_REGION) \
+# 			--stack-name $(AWS_STACK_NAME) \
+# 
+# outputs:
+# 		@make describe | jq -r '.Stacks[0].Outputs'
+# 
+# url:
+# 		@make describe | jq -r ".Stacks[0].Outputs[0].OutputValue" -j	

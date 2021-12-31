@@ -80,7 +80,7 @@ mutation {
   setConfig(config: {
     kind: "mulch",
     description: "Mulch",
-    isLocked: true,
+    isLocked: false,
     neighborhoods: [
       {
          name: "Avery Ranch",
@@ -282,6 +282,113 @@ var archivedOrdersQueryGql1 = `
 }
 `
 
+var IntrospectionQuery1 = `
+  query IntrospectionQuery {
+    __schema {
+      queryType { name }
+      mutationType { name }
+      subscriptionType { name }
+      types {
+        ...FullType
+      }
+      directives {
+        name
+        description
+		locations
+        args {
+          ...InputValue
+        }
+        # deprecated, but included for coverage till removed
+		onOperation
+        onFragment
+        onField
+      }
+    }
+  }
+  fragment FullType on __Type {
+    kind
+    name
+    description
+    fields(includeDeprecated: true) {
+      name
+      description
+      args {
+        ...InputValue
+      }
+      type {
+        ...TypeRef
+      }
+      isDeprecated
+      deprecationReason
+    }
+    inputFields {
+      ...InputValue
+    }
+    interfaces {
+      ...TypeRef
+    }
+    enumValues(includeDeprecated: true) {
+      name
+      description
+      isDeprecated
+      deprecationReason
+    }
+    possibleTypes {
+      ...TypeRef
+    }
+  }
+  fragment InputValue on __InputValue {
+    name
+    description
+    type { ...TypeRef }
+    defaultValue
+  }
+  fragment TypeRef on __Type {
+    kind
+    name
+    ofType {
+      kind
+      name
+      ofType {
+        kind
+        name
+        ofType {
+          kind
+          name
+          ofType {
+            kind
+            name
+            ofType {
+              kind
+              name
+              ofType {
+                kind
+                name
+                ofType {
+                  kind
+                  name
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`
+var InstrospectionQuery2 = `
+query allSchemaTypes {
+ __schema {
+    queryType {
+      fields {
+        name
+        description
+      }
+    }
+  }
+}
+`
+
 // func TestGraphQL(t *testing.T) {
 // 	h := handler.New(&handler.Config{
 // 		Schema:     &FrSchema,
@@ -421,5 +528,15 @@ func TestGraphQLSummaryCreateUpdateAndDeleteOrder(t *testing.T) {
 			t.Fatal("GraphQL Delete Order Failed: ", err)
 		}
 		t.Logf("\n%s \n\n", rJSON)
+	}
+}
+
+func TestGraphQLIntrospectionQuery(t *testing.T) {
+	{
+		rJSON, err := MakeGqlQuery(InstrospectionQuery2)
+		if err != nil {
+			t.Fatal("GraphQL Query Failed: ", err)
+		}
+		t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
 	}
 }
