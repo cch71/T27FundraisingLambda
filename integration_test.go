@@ -540,3 +540,29 @@ func TestGraphQLIntrospectionQuery(t *testing.T) {
 		t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
 	}
 }
+
+var queryOrdersQuickReportGql1 = `
+{
+  mulchOrders(ownerId: "fradmin") {
+    orderId
+    deliveryId
+    spreaders
+    customer {
+        name
+    }
+    purchases {
+        productId
+        numSold
+        amountCharged
+    }
+  }
+}
+`
+
+func TestGraphQLQueryQuickReportFrAdmin(t *testing.T) {
+	rJSON, err := MakeGqlQuery(queryOrdersQuickReportGql1)
+	if err != nil {
+		t.Fatal("GraphQL Query Failed: ", err)
+	}
+	t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
+}
