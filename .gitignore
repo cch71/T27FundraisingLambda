@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+fr_graphql_lambda
+go.sum
+T27FundraisingLambda
