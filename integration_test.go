@@ -566,3 +566,47 @@ func TestGraphQLQueryQuickReportFrAdmin(t *testing.T) {
 	}
 	t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
 }
+
+var mutationSetUsersGql1 = `
+mutation {
+  setUsers(users: [{
+    id: "fradmin"
+    group: "Bear"
+    name: "Super User"
+  },{
+    id: "fruser1"
+    group: "DontCount1"
+    name: "Test User 1"
+  },{
+    id: "fruser2"
+    group: "DontCount2"
+    name: "Test User 2"
+  }])
+}
+`
+
+func TestGraphQLQuerySetUsers(t *testing.T) {
+	rJSON, err := MakeGqlQuery(mutationSetUsersGql1)
+	if err != nil {
+		t.Fatal("GraphQL Query Failed: ", err)
+	}
+	t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
+}
+
+var queryUsersGql1 = `
+{
+  users {
+    id
+    group
+    name
+  }
+}
+`
+
+func TestGraphQLQueryUsers(t *testing.T) {
+	rJSON, err := MakeGqlQuery(queryUsersGql1)
+	if err != nil {
+		t.Fatal("GraphQL Query Failed: ", err)
+	}
+	t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
+}

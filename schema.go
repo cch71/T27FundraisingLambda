@@ -478,6 +478,57 @@ func init() {
 	}
 
 	//////////////////////////////////////////////////////////////////////////////
+	// User/Group Query/Input Types
+	userInfoType := graphql.NewObject(graphql.ObjectConfig{
+		Name:        "userInfoType",
+		Description: "User Info Type",
+		Fields: graphql.Fields{
+			"name":  &graphql.Field{Type: graphql.String},
+			"id":    &graphql.Field{Type: graphql.String},
+			"group": &graphql.Field{Type: graphql.String},
+		},
+	})
+	queryFields["users"] = &graphql.Field{
+		Type:        graphql.NewList(userInfoType),
+		Description: "Queries for list of users",
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			gqlFields := getSelectedFields([]string{"users"}, p)
+			return GetUsers(gqlFields)
+		},
+	}
+	userInputType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name:        "userInfoInputType",
+		Description: "Fundraiser user",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"name":  &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"id":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"group": &graphql.InputObjectFieldConfig{Type: graphql.String},
+		},
+	})
+	mutationFields["setUsers"] = &graphql.Field{
+		Type:        graphql.Boolean,
+		Description: "Replaces user data with provided data",
+		Args: graphql.FieldConfigArgument{
+			"users": &graphql.ArgumentConfig{
+				Description: "List of users",
+				Type:        graphql.NewList(userInputType),
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// log.Println("Setting Config: ", p.Args["config"])
+			jsonString, err := json.Marshal(p.Args["users"])
+			if err != nil {
+				fmt.Println("Error encoding JSON")
+				return nil, nil
+			}
+
+			users := []UserInfo{}
+			json.Unmarshal([]byte(jsonString), &users)
+			return SetUsers(users)
+		},
+	}
+
+	//////////////////////////////////////////////////////////////////////////////
 	// Summary Query Types
 	ownerIdSummaryType := graphql.NewObject(graphql.ObjectConfig{
 		Name:        "OwnerIdSummaryType",

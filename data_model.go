@@ -806,3 +806,114 @@ func GetMulchTimeCards(id string) []MulchTimecardType {
 	}
 	return timecards
 }
+
+////////////////////////////////////////////////////////////////////////////
+//
+type UserInfo struct {
+	Name  string `json:"name"`
+	Id    string `json:"id"`
+	Group string `json:"group"`
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func GetUsers(gqlFields []string) ([]UserInfo, error) {
+
+	log.Println("Retrieving Fundraiser Users")
+
+	users := []UserInfo{}
+	sqlFields := []string{}
+
+	for _, gqlField := range gqlFields {
+		switch {
+		case "name" == gqlField:
+			sqlFields = append(sqlFields, "name")
+		case "id" == gqlField:
+			sqlFields = append(sqlFields, "id")
+		case "group" == gqlField:
+			sqlFields = append(sqlFields, "group_id")
+		default:
+			return users, errors.New(fmt.Sprintf("Unknown fundraiser user field: %s", gqlField))
+		}
+
+	}
+
+	sqlCmd := fmt.Sprintf("select %s from users", strings.Join(sqlFields, ","))
+	rows, err := Db.Query(context.Background(), sqlCmd)
+	if err != nil {
+		log.Println("User query failed", err)
+		return users, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		user := UserInfo{}
+		inputs := []interface{}{}
+		for _, gqlField := range gqlFields {
+			switch {
+			case "name" == gqlField:
+				inputs = append(inputs, &user.Name)
+			case "id" == gqlField:
+				inputs = append(inputs, &user.Id)
+			case "group" == gqlField:
+				inputs = append(inputs, &user.Group)
+			default:
+				return users, errors.New(fmt.Sprintf("Unknown fundraiser user field: %s", gqlField))
+			}
+
+		}
+		err = rows.Scan(inputs...)
+		if err != nil {
+			log.Println("Reading User row failed: ", err)
+			continue
+		}
+		users = append(users, user)
+	}
+
+	if rows.Err() != nil {
+		log.Println("Reading User rows had an issue: ", err)
+		return []UserInfo{}, err
+	}
+	return users, nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func SetUsers(users []UserInfo) (bool, error) {
+	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
+	log.Println("Setting Users at: ", lastModifiedTime)
+
+	sqlCmd := "insert into users(id, name, group_id) values ($1, $2, $3)"
+
+	// Start Database Operations
+	trxn, err := Db.Begin(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	log.Println("Deleting existing record")
+	_, err = trxn.Exec(context.Background(), "delete from users")
+	if err != nil {
+		return false, err
+	}
+	log.Println("Setting Config SqlCmd: ", sqlCmd)
+	for _, user := range users {
+		_, err = trxn.Exec(context.Background(), sqlCmd, user.Id, user.Name, user.Group)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	sqlCmd2 := "UPDATE fundraiser_config SET last_modified_time=$1::timestamp WHERE last_modified_time=(SELECT last_modified_time FROM fundraiser_config LIMIT 1)"
+	_, err = trxn.Exec(context.Background(), sqlCmd2, lastModifiedTime)
+	if err != nil {
+		return false, err
+	}
+
+	log.Println("About to make a commitment")
+	err = trxn.Commit(context.Background())
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
