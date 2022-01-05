@@ -490,10 +490,27 @@ var summaryQueryGql2 = `
   }
 }
 `
+var summaryQueryGql3 = `
+{
+  summaryByOwnerId(ownerId: "fruser2") {
+    totalDeliveryMinutes
+    totalNumBagsSold
+    totalNumBagsSoldToSpread
+    totalAmountCollectedForDonations
+    totalAmountCollectedForBags
+    totalAmountCollectedForBagsToSpread
+    totalAmountCollected
+    allocationsFromDelivery
+    allocationsFromBagsSold
+    allocationsFromBagsSpread
+    allocationsTotal
+  }
+}
+`
 
 func TestGraphQLSummaryQuery(t *testing.T) {
 	{
-		rJSON, err := MakeGqlQuery(summaryQueryGql2)
+		rJSON, err := MakeGqlQuery(summaryQueryGql3)
 		if err != nil {
 			t.Fatal("GraphQL Query Failed: ", err)
 		}

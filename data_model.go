@@ -92,10 +92,79 @@ type OwnerIdSummaryType struct {
 //
 func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 	log.Println("Getting Summary for onwerId: ", ownerId)
+
+	sqlCmd := "select purchases::jsonb, amount_from_donations::string, total_amount_collected::string" +
+		" from mulch_orders where order_owner_id = $1"
+
+	rows, err := Db.Query(context.Background(), sqlCmd, ownerId)
+	if err != nil {
+		log.Println("User summary query failed", err)
+		return OwnerIdSummaryType{}, err
+	}
+	defer rows.Close()
+
+	totalCollected := decimal.NewFromInt(0)
+	totalCollectedForDonations := decimal.NewFromInt(0)
+	totalCollectedForBags := decimal.NewFromInt(0)
+	totalCollectedForSpreading := decimal.NewFromInt(0)
+	numBagsSold := 0
+	numBagsToSpreadSold := 0
+
+	for rows.Next() {
+		var purchases []ProductsType
+		var donationsAsStr *string
+		var totalCollectedAsStr *string
+
+		err = rows.Scan(&purchases, &donationsAsStr, &totalCollectedAsStr)
+		if err != nil {
+			log.Println("Reading User Summary row failed: ", err)
+			return OwnerIdSummaryType{}, err
+		}
+		if totalCollectedAsStr == nil {
+			continue
+		}
+		total, err := decimal.NewFromString(*totalCollectedAsStr)
+		if err != nil {
+			return OwnerIdSummaryType{}, err
+		}
+		totalCollected = totalCollected.Add(total)
+
+		if donationsAsStr != nil {
+			donationAmt, err := decimal.NewFromString(*donationsAsStr)
+			if err != nil {
+				return OwnerIdSummaryType{}, err
+			}
+			totalCollectedForDonations = totalCollectedForDonations.Add(donationAmt)
+		}
+
+		for _, item := range purchases {
+			amt, err := decimal.NewFromString(item.AmountCharged)
+			if err != nil {
+				return OwnerIdSummaryType{}, err
+			}
+			if "bags" == item.ProductId {
+				numBagsSold = numBagsSold + item.NumSold
+				totalCollectedForBags = totalCollectedForBags.Add(amt)
+			} else if "spreading" == item.ProductId {
+				numBagsToSpreadSold = numBagsToSpreadSold + item.NumSold
+				totalCollectedForSpreading = totalCollectedForSpreading.Add(amt)
+			}
+
+		}
+	}
+
+	if rows.Err() != nil {
+		log.Println("Reading User Summary rows had an issue: ", err)
+		return OwnerIdSummaryType{}, err
+	}
+
 	return OwnerIdSummaryType{
-		TotalDeliveryMinutes:             408,
-		TotalNumBagsSold:                 24,
-		TotalAmountCollectedForDonations: "52.44",
+		TotalNumBagsSold:                    numBagsSold,
+		TotalNumBagsSoldToSpread:            numBagsToSpreadSold,
+		TotalAmountCollectedForDonations:    totalCollectedForDonations.String(),
+		TotalAmountCollectedForBags:         totalCollectedForBags.String(),
+		TotalAmountCollectedForBagsToSpread: totalCollectedForSpreading.String(),
+		TotalAmountCollected:                totalCollected.String(),
 	}, nil
 }
 
@@ -144,13 +213,14 @@ func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
 	for rows.Next() {
 		var name string
 		var group string
-		var total_as_str string
-		err = rows.Scan(&name, &group, &total_as_str)
+		var totalAsStr string
+
+		err = rows.Scan(&name, &group, &totalAsStr)
 		if err != nil {
 			log.Println("Reading Summary row failed: ", err)
 			return TroopSummaryType{}, err
 		}
-		total, err := decimal.NewFromString(total_as_str)
+		total, err := decimal.NewFromString(totalAsStr)
 		if err != nil {
 			return TroopSummaryType{}, err
 		}
@@ -162,7 +232,7 @@ func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
 			groupTotals[group] = total
 		}
 
-		topSellers = append(topSellers, TopSellerType{Name: name, TotalAmountCollected: total_as_str})
+		topSellers = append(topSellers, TopSellerType{Name: name, TotalAmountCollected: totalAsStr})
 	}
 
 	if rows.Err() != nil {
