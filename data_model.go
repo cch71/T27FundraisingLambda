@@ -7,12 +7,14 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/shopspring/decimal"
 )
 
 ////////////////////////////////////////////////////////////////////////////
@@ -122,12 +124,79 @@ type TroopSummaryType struct {
 ////////////////////////////////////////////////////////////////////////////
 //
 func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
-	log.Println("Getting this many top sellers: ", numTopSellers)
+	log.Println("Getting Troop Summary with this many top sellers: ", numTopSellers)
+
+	sqlCmd := "select users.name, users.group_id, sum(total_amount_collected)::string from mulch_orders" +
+		" inner join users on (mulch_orders.order_owner_id = users.id) where" +
+		" total_amount_collected is not null group by order_owner_id, users.name, users.group_id"
+
+	rows, err := Db.Query(context.Background(), sqlCmd)
+	if err != nil {
+		log.Println("Troop summary query failed", err)
+		return TroopSummaryType{}, err
+	}
+	defer rows.Close()
+
+	troopTotal := decimal.NewFromInt(0)
+	groupTotals := make(map[string]decimal.Decimal)
+	topSellers := []TopSellerType{}
+
+	for rows.Next() {
+		var name string
+		var group string
+		var total_as_str string
+		err = rows.Scan(&name, &group, &total_as_str)
+		if err != nil {
+			log.Println("Reading Summary row failed: ", err)
+			return TroopSummaryType{}, err
+		}
+		total, err := decimal.NewFromString(total_as_str)
+		if err != nil {
+			return TroopSummaryType{}, err
+		}
+		troopTotal = troopTotal.Add(total)
+		group_val, is_present := groupTotals[group]
+		if is_present {
+			groupTotals[group] = group_val.Add(total)
+		} else {
+			groupTotals[group] = total
+		}
+
+		topSellers = append(topSellers, TopSellerType{Name: name, TotalAmountCollected: total_as_str})
+	}
+
+	if rows.Err() != nil {
+		log.Println("Reading Summary rows had an issue: ", err)
+		return TroopSummaryType{}, err
+	}
+	groupSummary := []GroupSummaryType{}
+	for k, v := range groupTotals {
+		groupSummary = append(groupSummary, GroupSummaryType{GroupId: k, TotalAmountCollected: v.String()})
+	}
+
+	sort.SliceStable(topSellers, func(r, l int) bool {
+		//I thought about options since total was parsed above but ulitmately felt like this was more memory
+		// efficient if not processor efficient
+		r_total, err := decimal.NewFromString(topSellers[r].TotalAmountCollected)
+		if err != nil {
+			return false
+		}
+		l_total, err := decimal.NewFromString(topSellers[l].TotalAmountCollected)
+		if err != nil {
+			return false
+		}
+		return r_total.GreaterThan(l_total)
+	})
+	if len(topSellers) > numTopSellers {
+		topSellers = topSellers[0:numTopSellers]
+	}
+
 	return TroopSummaryType{
-		TotalAmountCollected: "66.75",
-		GroupSummary:         []GroupSummaryType{GroupSummaryType{GroupId: "bears", TotalAmountCollected: "22.34"}, GroupSummaryType{GroupId: "lions", TotalAmountCollected: "42.34"}},
-		TopSellers:           []TopSellerType{TopSellerType{Name: "John", TotalAmountCollected: "11.23"}},
+		TotalAmountCollected: troopTotal.String(),
+		GroupSummary:         groupSummary,
+		TopSellers:           topSellers,
 	}, nil
+
 }
 
 ////////////////////////////////////////////////////////////////////////////

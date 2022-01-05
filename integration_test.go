@@ -11,40 +11,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var summaryQueryGql1 = `
-{
-  config {
-    kind
-    lastModifiedTime
-    isLocked
-  }
-  summaryByOwnerId(ownerId: "Bob") {
-    totalDeliveryMinutes
-    totalNumBagsSold
-    totalNumBagsSoldToSpread
-    totalAmountCollectedForDonations
-    totalAmountCollectedForBags
-    totalAmountCollectedForBagsToSpread
-    totalAmountCollected
-    allocationsFromDelivery
-    allocationsFromBagsSold
-    allocationsFromBagsSpread
-    allocationsTotal
-  }
-  troopSummary(numTopSellers: 10) {
-    totalAmountCollected
-    topSellers {
-      totalAmountCollected
-      name
-    }
-    groupSummary {
-      groupId
-      totalAmountCollected
-    }
-  }
-}
-`
-
 var activeConfigQueryGql1 = `
 {
   config {
@@ -476,9 +442,58 @@ func TestGraphQLActiveConfig(t *testing.T) {
 	}
 }
 
+var summaryQueryGql1 = `
+{
+  config {
+    kind
+    lastModifiedTime
+    isLocked
+  }
+  summaryByOwnerId(ownerId: "Bob") {
+    totalDeliveryMinutes
+    totalNumBagsSold
+    totalNumBagsSoldToSpread
+    totalAmountCollectedForDonations
+    totalAmountCollectedForBags
+    totalAmountCollectedForBagsToSpread
+    totalAmountCollected
+    allocationsFromDelivery
+    allocationsFromBagsSold
+    allocationsFromBagsSpread
+    allocationsTotal
+  }
+  troopSummary(numTopSellers: 10) {
+    totalAmountCollected
+    topSellers {
+      totalAmountCollected
+      name
+    }
+    groupSummary {
+      groupId
+      totalAmountCollected
+    }
+  }
+}
+`
+var summaryQueryGql2 = `
+{
+  troopSummary(numTopSellers: 10) {
+    totalAmountCollected
+    topSellers {
+      totalAmountCollected
+      name
+    }
+    groupSummary {
+      groupId
+      totalAmountCollected
+    }
+  }
+}
+`
+
 func TestGraphQLSummaryQuery(t *testing.T) {
 	{
-		rJSON, err := MakeGqlQuery(summaryQueryGql1)
+		rJSON, err := MakeGqlQuery(summaryQueryGql2)
 		if err != nil {
 			t.Fatal("GraphQL Query Failed: ", err)
 		}
@@ -486,7 +501,7 @@ func TestGraphQLSummaryQuery(t *testing.T) {
 	}
 }
 
-func TestGraphQLSummaryCreateUpdateAndDeleteOrder(t *testing.T) {
+func TestGraphQLCreateUpdateAndDeleteOrder(t *testing.T) {
 	uuidStr := uuid.New().String()
 
 	{
