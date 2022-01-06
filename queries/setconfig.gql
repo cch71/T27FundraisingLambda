@@ -1,0 +1,169 @@
+mutation {
+  setConfig(config: {
+    kind: "mulch",
+    description: "Mulch",
+    isLocked: false,
+    neighborhoods: [
+      {
+         name: "Avery Ranch",
+         distributionPoint: "Walsh"
+      },{
+         name: "Behrens Ranch",
+         distributionPoint: "Walsh"
+      },{
+         name: "Bent Tree",
+         distributionPoint: "Walsh"
+      },{
+         name: "Brushy Creek",
+         distributionPoint: "Walsh"
+      },{
+         name: "Brushy Creek North",
+         distributionPoint: "Walsh"
+      },{
+         name: "Cat Hollow",
+         distributionPoint: "Walsh"
+      },{
+         name: "Chandler Creek",
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Deep Wood",
+         distributionPoint: "Deep Wood"
+      },{
+         name: "Eagle Ridge",
+         distributionPoint: "Walsh"
+      },{
+         name: "Enclave @ Mayfield Ranch",
+         distributionPoint: "Walsh"
+      },{
+         name: "Escalera Ranch",
+         distributionPoint: "Escalera"
+      },{
+         name: "Estates at Settlers Park",
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Forest Bluff",
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Forest Creek",
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Forest Grove",
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Forest Ridge",
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Hidden Glen",
+         distributionPoint: "Walsh"
+      },{
+         name: "Highland Parks",
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Lake Forest",
+         distributionPoint: "Walsh"
+      },{
+         name: "Masters at Forest Creek",
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Mayfield Ranch",
+         distributionPoint: "Walsh"
+      },{
+         name: "Meadow Lake",
+         distributionPoint: "Walsh"
+      },{
+         name: "Morningside Meadows",
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Oak Bluff",
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Oak Hollow",
+         distributionPoint: "Walsh"
+      },{
+         name: "Paloma Lake",
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Preserve @ Dyer Creek",
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Round Rock West",
+         distributionPoint: "Deep Wood"
+      },{
+         name: "Ryans Crossing",
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Sendero Springs",
+         distributionPoint: "Walsh"
+      },{
+         name: "Silver Leaf",
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Sonoma",
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Stone Canyon",
+         distributionPoint: "Walsh"
+      },{
+         name: "Teravista",
+         distributionPoint: "Walsh"
+      },{
+         name: "The Woods",
+         distributionPoint: "Walsh"
+      },{
+         name: "Tonkawa Springs",
+         distributionPoint: "Walsh"
+      },{
+         name: "Vista Oaks",
+         distributionPoint: "Walsh"
+      },{
+         name: "Walsh Ranch",
+         distributionPoint: "Walsh"
+      },{
+         name: "Wood Glen",
+         distributionPoint: "Walsh"
+      },{
+         name: "Out of Area East",
+         distributionPoint: "Walsh"
+      },{
+         name: "Out of Area West",
+         distributionPoint: "Forest Creek"
+      }
+    ],
+    mulchDeliveryConfigs: [
+      {
+          id: 1,
+          date: "3/12/2022",
+          newOrderCutoffDate: "2/25/2021"
+      },
+      {
+          id: 2,
+          date: "4/9/2022",
+          newOrderCutoffDate: "3/20/2022"
+      }
+    ],
+    products: [
+      {
+          id: "bags",
+          label: "Bags of Mulch",
+          unitPrice: "4.65",
+          minUnits: 5,
+          priceBreaks: [
+              {
+                  gt: 15,
+                  unitPrice: "4.50"
+              },{
+                  gt: 35,
+                  unitPrice: "4.35"
+              },{
+                  gt: 64,
+                  unitPrice: "4.25"
+              }
+          ]
+      },{
+          id: "spreading",
+          label: "Bags to Spread",
+          unitPrice: "2.00"
+      }
+    ]
+  })
+}

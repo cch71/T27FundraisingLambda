@@ -3,6 +3,9 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 
+MK_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
+DIST_DIR := ${MK_DIR}/dist
+
 clean:
 		@rm -rf dist
 		@mkdir -p dist
@@ -11,7 +14,10 @@ build: clean
 		# @for dir in `ls handler`; do \
 		# 	GOOS=linux go build -o dist/handler/$$dir github.com/sbstjn/go-lambda-example/handler/$$dir; \
 		# done
-		GOOS=linux CGO_ENABLED=0 go build -ldflags="-s -w" -o dist/gqlhandler
+		cd ${MK_DIR}/cmd/T27FundraisingLambda && GOOS=linux CGO_ENABLED=0 go build -ldflags="-s -w" -o ${DIST_DIR}/gqlhandler
+
+cli: clean
+		cd ${MK_DIR}/cmd/t27frcli && go build -o ${DIST_DIR}/t27frcli
 
 dist: build
 		cp $(DB_CA_ROOT_PATH) dist
