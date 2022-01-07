@@ -10,16 +10,13 @@ clean:
 		@rm -rf dist
 		@mkdir -p dist
 
-build: clean
-		# @for dir in `ls handler`; do \
-		# 	GOOS=linux go build -o dist/handler/$$dir github.com/sbstjn/go-lambda-example/handler/$$dir; \
-		# done
+lambda: clean
 		cd ${MK_DIR}/cmd/lambda && GOOS=linux CGO_ENABLED=0 go build -ldflags="-s -w" -o ${DIST_DIR}/gqlhandler
 
 cli: clean
 		cd ${MK_DIR}/cmd/t27frcli && go build -o ${DIST_DIR}/t27frcli
 
-dist: build
+dist: lambda
 		cp $(DB_CA_ROOT_PATH) dist
 		cd dist && zip function.zip gqlhandler root.crt
 
@@ -40,6 +37,10 @@ test:
 deploy: dist
 		aws lambda update-function-code --function-name ${GQL_LAMBDA_FUNCTION_NAME} --zip-file fileb://${PWD}/dist/function.zip
 
+#lambda: clean
+		# @for dir in `ls handler`; do \
+		# 	GOOS=linux go build -o dist/handler/$$dir github.com/sbstjn/go-lambda-example/handler/$$dir; \
+		# done
 # configure:
 # 		aws s3api create-bucket \
 # 			--bucket $(AWS_BUCKET_NAME) \

@@ -16,7 +16,7 @@ import (
 //
 func main() {
 
-	credentialsFile := path.Join(os.Getenv("HOME"), ".cockroachdb", "credentials")
+	credentialsFile := path.Join(os.Getenv("HOME"), ".t27fr", "credentials")
 	_ = godotenv.Load(credentialsFile)
 
 	gqlFn := flag.String("gql", "", "GraphGQ File")
