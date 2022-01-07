@@ -24,7 +24,7 @@ mutation {
          distributionPoint: "Walsh"
       },{
          name: "Chandler Creek",
-         distributionPoint: "Forest Creek"
+         distributionPoint: "Walsh"
       },{
          name: "Deep Wood",
          distributionPoint: "Deep Wood"
@@ -38,10 +38,7 @@ mutation {
          name: "Escalera Ranch",
          distributionPoint: "Escalera"
       },{
-         name: "Estates at Settlers Park",
-         distributionPoint: "Forest Creek"
-      },{
-         name: "Forest Bluff",
+         name: "Forest Bluffs",
          distributionPoint: "Forest Creek"
       },{
          name: "Forest Creek",
@@ -60,7 +57,7 @@ mutation {
          distributionPoint: "Forest Creek"
       },{
          name: "Lake Forest",
-         distributionPoint: "Walsh"
+         distributionPoint: "Forest Creek"
       },{
          name: "Masters at Forest Creek",
          distributionPoint: "Forest Creek"
@@ -123,17 +120,17 @@ mutation {
          distributionPoint: "Walsh"
       },{
          name: "Out of Area East",
-         distributionPoint: "Walsh"
+         distributionPoint: "Forest Creek"
       },{
          name: "Out of Area West",
-         distributionPoint: "Forest Creek"
+         distributionPoint: "Walsh"
       }
     ],
     mulchDeliveryConfigs: [
       {
           id: 1,
           date: "3/12/2022",
-          newOrderCutoffDate: "2/25/2021"
+          newOrderCutoffDate: "2/25/2022"
       },
       {
           id: 2,
