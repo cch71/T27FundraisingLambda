@@ -478,6 +478,39 @@ func init() {
 	}
 
 	//////////////////////////////////////////////////////////////////////////////
+	// Creates Issue Report
+	newIssueInputType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name:        "NewIssueType",
+		Description: "Issue Report Information",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"id":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"title": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"body":  &graphql.InputObjectFieldConfig{Type: graphql.String},
+		},
+	})
+	mutationFields["createIssue"] = &graphql.Field{
+		Type:        graphql.Boolean,
+		Description: "Creates a new issue report",
+		Args: graphql.FieldConfigArgument{
+			"input": &graphql.ArgumentConfig{
+				Description: "Issue Report Information",
+				Type:        newIssueInputType,
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// log.Println("Setting Config: ", p.Args["config"])
+			jsonString, err := json.Marshal(p.Args["input"])
+			if err != nil {
+				fmt.Println("Error encoding JSON")
+				return nil, nil
+			}
+
+			issue := NewIssue{}
+			json.Unmarshal([]byte(jsonString), &issue)
+			return CreateIssue(issue)
+		},
+	}
+	//////////////////////////////////////////////////////////////////////////////
 	// User/Group Query/Input Types
 	userInfoType := graphql.NewObject(graphql.ObjectConfig{
 		Name:        "userInfoType",

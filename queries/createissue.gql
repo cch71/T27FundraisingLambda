@@ -1,0 +1,7 @@
+mutation {
+  createIssue(input: {
+    id: "fruser1",
+    title: "Test Title",
+    body: "Issue Body"
+  })
+}

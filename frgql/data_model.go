@@ -1142,3 +1142,67 @@ func SetUsers(users []UserInfo, jwt string) (bool, error) {
 
 	return true, nil
 }
+
+type NewIssue struct {
+	Id    string `json:"id"`
+	Title string `title"`
+	Body  string `json:"body"`
+}
+
+var newIssueGql = `
+mutation CreateIssue {
+  createIssue(input: {
+		repositoryId: "MDEwOlJlcG9zaXRvcnkzMDQ5ODg5MDE=",
+		title: "***TITLE***",
+		body: "***BODY***",
+		labelIds: ["MDU6TGFiZWwyNDM0MzA3ODIy", "LA_kwDOEi3C5c7dGLgb"],
+		assigneeIds:["MDQ6VXNlcjM0OTQ5Mg=="]
+	}) {
+    issue {
+      number
+      body
+    }
+  }
+}
+`
+
+func CreateIssue(issue NewIssue) (bool, error) {
+	url := "https://api.github.com/graphql"
+
+	title := fmt.Sprint("[", issue.Id, "] ", issue.Title)
+	newIssueReq := strings.ReplaceAll(newIssueGql, "***TITLE***", title)
+	newIssueReq = strings.ReplaceAll(newIssueReq, "***BODY***", issue.Body)
+
+	type GReq struct {
+		Query string `json:"query"`
+	}
+	gqlReq := GReq{Query: newIssueReq}
+
+	reqBytes, err := json.Marshal(gqlReq)
+	if err != nil {
+		return false, err
+	}
+
+	log.Println(string(reqBytes))
+	payload := strings.NewReader(string(reqBytes))
+
+	req, err := http.NewRequest("POST", url, payload)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("content-type", "application/json")
+	req.Header.Add("authorization", "Bearer "+os.Getenv("CREATE_ISSUE_TOKEN"))
+
+	res, err := http.DefaultClient.Do(req)
+
+	log.Println(res)
+	if err != nil {
+		return false, err
+	}
+
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	log.Println(string(body))
+
+	return true, nil
+}
