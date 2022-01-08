@@ -500,9 +500,10 @@ func init() {
 		Name:        "userInfoInputType",
 		Description: "Fundraiser user",
 		Fields: graphql.InputObjectConfigFieldMap{
-			"name":  &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"id":    &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"group": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"name":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"id":       &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"group":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"password": &graphql.InputObjectFieldConfig{Type: graphql.String},
 		},
 	})
 	mutationFields["setUsers"] = &graphql.Field{
@@ -513,18 +514,29 @@ func init() {
 				Description: "List of users",
 				Type:        graphql.NewList(userInputType),
 			},
+			"token": &graphql.ArgumentConfig{
+				Description: "Token for admin",
+				Type:        graphql.String,
+			},
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 			// log.Println("Setting Config: ", p.Args["config"])
-			jsonString, err := json.Marshal(p.Args["users"])
-			if err != nil {
-				fmt.Println("Error encoding JSON")
-				return nil, nil
+			token := ""
+			if val, ok := p.Args["token"]; ok {
+				token = val.(string)
 			}
 
+			jsonString, err := json.Marshal(p.Args["users"])
+			if err != nil {
+				log.Println("Error encoding JSON")
+				return nil, nil
+			}
 			users := []UserInfo{}
-			json.Unmarshal([]byte(jsonString), &users)
-			return SetUsers(users)
+			if err := json.Unmarshal([]byte(jsonString), &users); err != nil {
+				log.Println("Error decoding JSON to userinfo")
+				return nil, nil
+			}
+			return SetUsers(users, token)
 		},
 	}
 

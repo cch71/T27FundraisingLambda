@@ -15,6 +15,7 @@ func MakeGqlQuery(gql string) ([]byte, error) {
 	if len(r.Errors) > 0 {
 		log.Printf("failed to execute graphql operation, errors: %+v", r.Errors)
 	}
+
 	rJSON, err := json.Marshal(r)
 	if err != nil {
 		log.Println("Error encoding JSON results: ", err, " for gql: ", gql)

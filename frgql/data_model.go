@@ -2,9 +2,12 @@ package frgql
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"sort"
@@ -957,9 +960,10 @@ func GetMulchTimeCards(id string) []MulchTimecardType {
 ////////////////////////////////////////////////////////////////////////////
 //
 type UserInfo struct {
-	Name  string `json:"name"`
-	Id    string `json:"id"`
-	Group string `json:"group"`
+	Name     string `json:"name"`
+	Id       string `json:"id"`
+	Group    string `json:"group"`
+	Password string `json:"password,omitempty"`
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -1024,9 +1028,66 @@ func GetUsers(gqlFields []string) ([]UserInfo, error) {
 	return users, nil
 }
 
+type CreateUserAppMeta struct {
+	FullName string `json:"full_name"`
+}
+
+type CreateUser struct {
+	Email         string            `json:"email"`
+	EmailVerified bool              `json:"email_verified"`
+	AppMeta       CreateUserAppMeta `json:"app_metadata"`
+	Nickname      string            `json:"nickname"`
+	Connection    string            `json:"connection"`
+	VerifyEmail   bool              `json:"verify_email"`
+	Password      string            `json:"password"`
+}
+
 ////////////////////////////////////////////////////////////////////////////
 //
-func SetUsers(users []UserInfo) (bool, error) {
+func createUser(user *UserInfo, jwt *string) error {
+
+	param := CreateUser{
+		Email:         user.Id + "@bsatroop27.us",
+		EmailVerified: true,
+		AppMeta: CreateUserAppMeta{
+			FullName: user.Name,
+		},
+		Nickname:    user.Id,
+		Connection:  "Username-Password-Authentication",
+		VerifyEmail: false,
+		Password:    user.Password,
+	}
+
+	paramInBytes, err := json.Marshal(param)
+	if err != nil {
+		return errors.New(fmt.Sprint("Failed to marshal user. Err:", err))
+	}
+
+	url := fmt.Sprint(os.Getenv("AUTH0_BASE_URL"), "api/v2/users")
+	payload := strings.NewReader(string(paramInBytes))
+
+	req, err := http.NewRequest("POST", url, payload)
+	if err != nil {
+		return errors.New(fmt.Sprint("Failed creating request. Err: ", err))
+	}
+	req.Header.Add("content-type", "application/json")
+	req.Header.Add("authorization", "Bearer "+*jwt)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Println(res)
+		return errors.New(fmt.Sprint("Failed making request. Err: ", err))
+	}
+
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	log.Println(string(body))
+	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func SetUsers(users []UserInfo, jwt string) (bool, error) {
 	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
 	log.Println("Setting Users at: ", lastModifiedTime)
 
@@ -1062,5 +1123,22 @@ func SetUsers(users []UserInfo) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
+	if len(jwt) <= 0 {
+		jwt = os.Getenv("AUTH0_ADMIN_TOKEN")
+	}
+
+	// Now go back through looking for password and if present create the account
+	if len(jwt) > 0 {
+		for _, user := range users {
+			if len(user.Password) <= 0 {
+				continue
+			}
+			if err := createUser(&user, &jwt); err != nil {
+				log.Println("Failed creating user: ", err)
+			}
+		}
+	}
+
 	return true, nil
 }
