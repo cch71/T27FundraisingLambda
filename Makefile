@@ -37,10 +37,10 @@ test:
 deploy: dist
 		aws lambda update-function-code --function-name ${GQL_LAMBDA_FUNCTION_NAME} --zip-file fileb://${PWD}/dist/function.zip
 
-#lambda: clean
-		# @for dir in `ls handler`; do \
-		# 	GOOS=linux go build -o dist/handler/$$dir github.com/sbstjn/go-lambda-example/handler/$$dir; \
-		# done
+# oldlambda: clean
+# 		 @for dir in `ls handler`; do \
+# 		 	GOOS=linux go build -o dist/handler/$$dir github.com/sbstjn/go-lambda-example/handler/$$dir; \
+# 		 done
 # configure:
 # 		aws s3api create-bucket \
 # 			--bucket $(AWS_BUCKET_NAME) \

@@ -1,0 +1,32 @@
+{
+  config {
+    description
+    kind
+    isLocked
+    lastModifiedTime
+    neighborhoods {
+      name
+      distributionPoint
+    }
+    mulchDeliveryConfigs {
+      id
+      date
+      newOrderCutoffDate
+    }
+    products {
+      id
+      label
+      unitPrice
+      minUnits
+      priceBreaks {
+        gt
+        unitPrice
+      }
+    }
+    users {
+      id
+      group
+      name
+    }
+  }
+}

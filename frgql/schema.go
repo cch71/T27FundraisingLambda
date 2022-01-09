@@ -2,6 +2,7 @@ package frgql
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 
@@ -354,6 +355,70 @@ func init() {
 	}
 
 	//////////////////////////////////////////////////////////////////////////////
+	// User/Group Query/Input Types
+	userInfoType := graphql.NewObject(graphql.ObjectConfig{
+		Name:        "userInfoType",
+		Description: "User Info Type",
+		Fields: graphql.Fields{
+			"name":  &graphql.Field{Type: graphql.String},
+			"id":    &graphql.Field{Type: graphql.String},
+			"group": &graphql.Field{Type: graphql.String},
+		},
+	})
+	queryFields["users"] = &graphql.Field{
+		Type:        graphql.NewList(userInfoType),
+		Description: "Queries for list of users",
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			gqlFields := getSelectedFields([]string{"users"}, p)
+			return GetUsers(gqlFields)
+		},
+	}
+
+	userInputType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name:        "userInfoInputType",
+		Description: "Fundraiser user",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"name":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"id":       &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"group":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"password": &graphql.InputObjectFieldConfig{Type: graphql.String},
+		},
+	})
+	mutationFields["setUsers"] = &graphql.Field{
+		Type:        graphql.Boolean,
+		Description: "Replaces user data with provided data",
+		Args: graphql.FieldConfigArgument{
+			"users": &graphql.ArgumentConfig{
+				Description: "List of users",
+				Type:        graphql.NewList(userInputType),
+			},
+			"token": &graphql.ArgumentConfig{
+				Description: "Token for admin",
+				Type:        graphql.String,
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// log.Println("Setting Config: ", p.Args["config"])
+			token := ""
+			if val, ok := p.Args["token"]; ok {
+				token = val.(string)
+			}
+
+			jsonString, err := json.Marshal(p.Args["users"])
+			if err != nil {
+				log.Println("Error encoding JSON")
+				return nil, nil
+			}
+			users := []UserInfo{}
+			if err := json.Unmarshal([]byte(jsonString), &users); err != nil {
+				log.Println("Error decoding JSON to userinfo")
+				return nil, nil
+			}
+			return SetUsers(users, token)
+		},
+	}
+
+	//////////////////////////////////////////////////////////////////////////////
 	// Config Query Types
 	mulchDeliveryConfigType := graphql.NewObject(graphql.ObjectConfig{
 		Name: "MulchDeliveryConfigType",
@@ -398,6 +463,7 @@ func init() {
 			"mulchDeliveryConfigs": &graphql.Field{Type: graphql.NewList(mulchDeliveryConfigType)},
 			"products":             &graphql.Field{Type: graphql.NewList(productConfigType)},
 			"neighborhoods":        &graphql.Field{Type: graphql.NewList(neighborhoodConfigType)},
+			"users":                queryFields["users"],
 		},
 	})
 	queryFields["config"] = &graphql.Field{
@@ -478,6 +544,36 @@ func init() {
 	}
 
 	//////////////////////////////////////////////////////////////////////////////
+	// Adds Spreaders to order
+	mutationFields["setSpreaders"] = &graphql.Field{
+		Type:        graphql.Boolean,
+		Description: "Sets spreader information for an order",
+		Args: graphql.FieldConfigArgument{
+			"orderId": &graphql.ArgumentConfig{
+				Description: "The id of the order associated with the spreaders",
+				Type:        graphql.NewNonNull(graphql.String),
+			},
+			"spreaders": &graphql.ArgumentConfig{
+				Description: "list of userids that performed the spreading, can be empty",
+				Type:        graphql.NewNonNull(graphql.NewList(graphql.String)),
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// log.Println("Setting Config: ", p.Args["config"])
+			orderId := p.Args["orderId"].(string)
+			jsonString, err := json.Marshal(p.Args["spreaders"])
+			if err != nil {
+				return false, errors.New("spreaders param not formatted correctly")
+			}
+			spreaders := []string{}
+			if err := json.Unmarshal([]byte(jsonString), &spreaders); err != nil {
+				return false, errors.New("spreaders could not be decoded")
+			}
+			return SetSpreaders(orderId, spreaders)
+		},
+	}
+
+	//////////////////////////////////////////////////////////////////////////////
 	// Creates Issue Report
 	newIssueInputType := graphql.NewInputObject(graphql.InputObjectConfig{
 		Name:        "NewIssueType",
@@ -510,69 +606,6 @@ func init() {
 			return CreateIssue(issue)
 		},
 	}
-	//////////////////////////////////////////////////////////////////////////////
-	// User/Group Query/Input Types
-	userInfoType := graphql.NewObject(graphql.ObjectConfig{
-		Name:        "userInfoType",
-		Description: "User Info Type",
-		Fields: graphql.Fields{
-			"name":  &graphql.Field{Type: graphql.String},
-			"id":    &graphql.Field{Type: graphql.String},
-			"group": &graphql.Field{Type: graphql.String},
-		},
-	})
-	queryFields["users"] = &graphql.Field{
-		Type:        graphql.NewList(userInfoType),
-		Description: "Queries for list of users",
-		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			gqlFields := getSelectedFields([]string{"users"}, p)
-			return GetUsers(gqlFields)
-		},
-	}
-	userInputType := graphql.NewInputObject(graphql.InputObjectConfig{
-		Name:        "userInfoInputType",
-		Description: "Fundraiser user",
-		Fields: graphql.InputObjectConfigFieldMap{
-			"name":     &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"id":       &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"group":    &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"password": &graphql.InputObjectFieldConfig{Type: graphql.String},
-		},
-	})
-	mutationFields["setUsers"] = &graphql.Field{
-		Type:        graphql.Boolean,
-		Description: "Replaces user data with provided data",
-		Args: graphql.FieldConfigArgument{
-			"users": &graphql.ArgumentConfig{
-				Description: "List of users",
-				Type:        graphql.NewList(userInputType),
-			},
-			"token": &graphql.ArgumentConfig{
-				Description: "Token for admin",
-				Type:        graphql.String,
-			},
-		},
-		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			// log.Println("Setting Config: ", p.Args["config"])
-			token := ""
-			if val, ok := p.Args["token"]; ok {
-				token = val.(string)
-			}
-
-			jsonString, err := json.Marshal(p.Args["users"])
-			if err != nil {
-				log.Println("Error encoding JSON")
-				return nil, nil
-			}
-			users := []UserInfo{}
-			if err := json.Unmarshal([]byte(jsonString), &users); err != nil {
-				log.Println("Error decoding JSON to userinfo")
-				return nil, nil
-			}
-			return SetUsers(users, token)
-		},
-	}
-
 	//////////////////////////////////////////////////////////////////////////////
 	// Summary Query Types
 	ownerIdSummaryType := graphql.NewObject(graphql.ObjectConfig{

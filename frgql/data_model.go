@@ -314,6 +314,7 @@ type MulchOrderType struct {
 	CheckNumbers              *string
 	WillCollectMoneyLater     *bool
 	IsVerified                *bool
+	Spreaders                 []string
 	Customer                  CustomerType
 	Purchases                 []ProductsType
 	DeliveryId                *int   // Not in archived GraphQL
@@ -331,16 +332,17 @@ type GetMulchOrdersParams struct {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]string, []interface{}) {
+func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]string, []interface{}, string) {
 
 	sqlFields := []string{}
 	inputs := []interface{}{}
+	joinSql := ""
 	for _, gqlField := range gqlFields {
 		// log.Println(gqlField)
 		switch {
 		case gqlField == "orderId":
 			inputs = append(inputs, &orderOutput.OrderId)
-			sqlFields = append(sqlFields, "order_id")
+			sqlFields = append(sqlFields, "mulch_orders.order_id")
 		case gqlField == "ownerId":
 			inputs = append(inputs, &orderOutput.OwnerId)
 			sqlFields = append(sqlFields, "order_owner_id")
@@ -383,6 +385,10 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 		case gqlField == "isVerified":
 			inputs = append(inputs, &orderOutput.IsVerified)
 			sqlFields = append(sqlFields, "is_verified")
+		case gqlField == "spreaders":
+			inputs = append(inputs, &orderOutput.Spreaders)
+			sqlFields = append(sqlFields, "spreaders::jsonb")
+			joinSql = "LEFT JOIN mulch_spreaders ON mulch_orders.order_id = mulch_spreaders.order_id"
 		case gqlField == "customer":
 			inputs = append(inputs, &orderOutput.Customer.Name)
 			sqlFields = append(sqlFields, "customer_name")
@@ -401,15 +407,18 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 		}
 
 	}
-	return sqlFields, inputs
+	return sqlFields, inputs, joinSql
 }
 
 ////////////////////////////////////////////////////////////////////////////
 //
 func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 
+	//select order_owner_id, spreaders from mulch_orders left join mulch_spreaders on mulch_orders.order_id = mulch_spreaders.order_id
+	//where mulch_orders.order_id = '2a166081-787f-4ff6-9477-31b21b6ca2f7';
+
 	order := MulchOrderType{}
-	sqlFields, _ := mulchOrderGql2SqlMap(params.GqlFields, &order)
+	sqlFields, _, joinSql := mulchOrderGql2SqlMap(params.GqlFields, &order)
 
 	dbTable := "mulch_orders"
 	if params.IsFromArchive {
@@ -425,7 +434,7 @@ func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 	}
 
 	doQuery := func(id *string, dbTable *string, sqlFields []string) (pgx.Rows, error) {
-		sqlCmd := fmt.Sprintf("select %s from %s", strings.Join(sqlFields, ","), *dbTable)
+		sqlCmd := fmt.Sprintf("select %s from %s %s", strings.Join(sqlFields, ","), *dbTable, joinSql)
 		if len(*id) == 0 {
 			log.Println("SqlCmd: ", sqlCmd)
 			return Db.Query(context.Background(), sqlCmd)
@@ -446,7 +455,7 @@ func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 
 	for rows.Next() {
 		order := MulchOrderType{}
-		_, inputs := mulchOrderGql2SqlMap(params.GqlFields, &order)
+		_, inputs, _ := mulchOrderGql2SqlMap(params.GqlFields, &order)
 		err = rows.Scan(inputs...)
 		if err != nil {
 			log.Println("Reading mulch order row failed: ", err)
@@ -476,13 +485,13 @@ func GetMulchOrder(params GetMulchOrderParams) MulchOrderType {
 	log.Println("Retrieving mulch order. ", "Is targeting archive: ", params.IsFromArchive, " OrderId: ", params.OrderId)
 
 	order := MulchOrderType{}
-	sqlFields, inputs := mulchOrderGql2SqlMap(params.GqlFields, &order)
+	sqlFields, inputs, joinSql := mulchOrderGql2SqlMap(params.GqlFields, &order)
 
 	dbTable := "mulch_orders"
 	if params.IsFromArchive {
 		dbTable = "archived_mulch_orders"
 	}
-	sqlCmd := fmt.Sprintf("select %s from %s where order_id=$1", strings.Join(sqlFields, ","), dbTable)
+	sqlCmd := fmt.Sprintf("select %s from %s %s where mulch_orders.order_id=$1", strings.Join(sqlFields, ","), dbTable, joinSql)
 	log.Println("SqlCmd: ", sqlCmd)
 	err := Db.QueryRow(context.Background(), sqlCmd, params.OrderId).Scan(inputs...)
 	if err != nil {
@@ -805,6 +814,8 @@ func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
 		case "products" == gqlField:
 			params = append(params, &frConfig.Products)
 			sqlFields = append(sqlFields, "products::jsonb")
+		case "users" == gqlField:
+			//Skipping because it is handled seperately
 		default:
 			return frConfig, errors.New(fmt.Sprintf("Unknown fundraiser config field: %s", gqlField))
 		}
@@ -1145,7 +1156,7 @@ func SetUsers(users []UserInfo, jwt string) (bool, error) {
 
 type NewIssue struct {
 	Id    string `json:"id"`
-	Title string `title"`
+	Title string `json:"title"`
 	Body  string `json:"body"`
 }
 
@@ -1204,5 +1215,39 @@ func CreateIssue(issue NewIssue) (bool, error) {
 	body, _ := io.ReadAll(res.Body)
 	log.Println(string(body))
 
+	return true, nil
+}
+
+func SetSpreaders(orderId string, spreaders []string) (bool, error) {
+
+	if len(orderId) == 0 {
+		return false, errors.New("orderId must be provided")
+	}
+
+	// Start Database Operations
+	trxn, err := Db.Begin(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	log.Println("Deleting existing record")
+	_, err = trxn.Exec(context.Background(), "delete from mulch_spreaders where order_id = $1", orderId)
+	if err != nil {
+		return false, err
+	}
+
+	if len(spreaders) > 0 {
+		sqlCmd := "insert into mulch_spreaders(order_id, spreaders) values ($1, $2::jsonb)"
+		_, err = trxn.Exec(context.Background(), sqlCmd, orderId, spreaders)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	log.Println("About to make a commitment")
+	err = trxn.Commit(context.Background())
+	if err != nil {
+		return false, err
+	}
 	return true, nil
 }

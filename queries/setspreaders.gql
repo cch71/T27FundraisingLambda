@@ -1,0 +1,6 @@
+mutation {
+  setSpreaders(
+    orderId: "2a166081-787f-4ff6-9477-31b21b6ca2f7",
+    spreaders: ["fruser1", "fruser3"]
+  )
+}

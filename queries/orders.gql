@@ -1,0 +1,12 @@
+{
+  mulchOrders {
+    orderId
+    ownerId
+    amountTotalCollected
+    isVerified
+    spreaders
+    customer {
+        name
+    }
+  }
+}

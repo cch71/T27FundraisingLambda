@@ -11,36 +11,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var activeConfigQueryGql1 = `
-{
-  config {
-    description
-    kind
-    isLocked
-    lastModifiedTime
-    neighborhoods {
-      name
-      distributionPoint
-    }
-    mulchDeliveryConfigs {
-      id
-      date
-      newOrderCutoffDate
-    }
-    products {
-      id
-      label
-      unitPrice
-      minUnits
-      priceBreaks {
-        gt
-        unitPrice
-      }
-    }
-  }
-}
-`
-
 var setActiveConfigMutationGql = `
 mutation {
   setConfig(config: {
@@ -642,3 +612,33 @@ func TestGraphQLQueryUsers(t *testing.T) {
 	}
 	t.Logf("%s \n", rJSON) // {"data":{"hello":"world"}}
 }
+
+var activeConfigQueryGql1 = `
+{
+  config {
+    description
+    kind
+    isLocked
+    lastModifiedTime
+    neighborhoods {
+      name
+      distributionPoint
+    }
+    mulchDeliveryConfigs {
+      id
+      date
+      newOrderCutoffDate
+    }
+    products {
+      id
+      label
+      unitPrice
+      minUnits
+      priceBreaks {
+        gt
+        unitPrice
+      }
+    }
+  }
+}
+`
