@@ -1,0 +1,7 @@
+mutation {
+  addUser(
+    id: "vikasg"
+    group: "Bear"
+    name: "Vikas Gupta"
+  )
+}

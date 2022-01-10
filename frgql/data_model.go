@@ -1115,7 +1115,7 @@ func SetUsers(users []UserInfo, jwt string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	log.Println("Setting Config SqlCmd: ", sqlCmd)
+	log.Println("Adding Users SqlCmd: ", sqlCmd)
 	for _, user := range users {
 		_, err = trxn.Exec(context.Background(), sqlCmd, user.Id, user.Name, user.Group)
 		if err != nil {
@@ -1154,12 +1154,55 @@ func SetUsers(users []UserInfo, jwt string) (bool, error) {
 	return true, nil
 }
 
+////////////////////////////////////////////////////////////////////////////
+//
+func AddUser(id, group, name string) (bool, error) {
+	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
+	log.Println("Setting Users at: ", lastModifiedTime)
+
+	// Start Database Operations
+	trxn, err := Db.Begin(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	log.Println("Deleting existing record if it exists")
+	_, err = trxn.Exec(context.Background(), "delete from users where id = $1", id)
+	if err != nil {
+		return false, err
+	}
+
+	sqlCmd := "insert into users(id, name, group_id) values ($1, $2, $3)"
+	log.Println("Adding user SqlCmd: ", sqlCmd)
+	_, err = trxn.Exec(context.Background(), sqlCmd, id, name, group)
+	if err != nil {
+		return false, err
+	}
+
+	sqlCmd2 := "UPDATE fundraiser_config SET last_modified_time=$1::timestamp WHERE last_modified_time=(SELECT last_modified_time FROM fundraiser_config LIMIT 1)"
+	_, err = trxn.Exec(context.Background(), sqlCmd2, lastModifiedTime)
+	if err != nil {
+		return false, err
+	}
+
+	log.Println("About to make a commitment")
+	err = trxn.Commit(context.Background())
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
 type NewIssue struct {
 	Id    string `json:"id"`
 	Title string `json:"title"`
 	Body  string `json:"body"`
 }
 
+////////////////////////////////////////////////////////////////////////////
+//
 var newIssueGql = `
 mutation CreateIssue {
   createIssue(input: {
@@ -1177,6 +1220,8 @@ mutation CreateIssue {
 }
 `
 
+////////////////////////////////////////////////////////////////////////////
+//
 func CreateIssue(issue NewIssue) (bool, error) {
 	url := "https://api.github.com/graphql"
 
@@ -1218,6 +1263,8 @@ func CreateIssue(issue NewIssue) (bool, error) {
 	return true, nil
 }
 
+////////////////////////////////////////////////////////////////////////////
+//
 func SetSpreaders(orderId string, spreaders []string) (bool, error) {
 
 	if len(orderId) == 0 {

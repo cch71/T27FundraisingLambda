@@ -418,6 +418,32 @@ func init() {
 		},
 	}
 
+	mutationFields["addUser"] = &graphql.Field{
+		Type:        graphql.Boolean,
+		Description: "Sets spreader information for an order",
+		Args: graphql.FieldConfigArgument{
+			"id": &graphql.ArgumentConfig{
+				Description: "The id of the new user",
+				Type:        graphql.NewNonNull(graphql.String),
+			},
+			"group": &graphql.ArgumentConfig{
+				Description: "Group user belongs too",
+				Type:        graphql.NewNonNull(graphql.String),
+			},
+			"name": &graphql.ArgumentConfig{
+				Description: "Users full name",
+				Type:        graphql.NewNonNull(graphql.String),
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// log.Println("Setting Config: ", p.Args["config"])
+			id := p.Args["id"].(string)
+			group := p.Args["group"].(string)
+			name := p.Args["name"].(string)
+			return AddUser(id, group, name)
+		},
+	}
+
 	//////////////////////////////////////////////////////////////////////////////
 	// Config Query Types
 	mulchDeliveryConfigType := graphql.NewObject(graphql.ObjectConfig{

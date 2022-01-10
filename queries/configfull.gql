@@ -25,7 +25,6 @@
     }
     users {
       id
-      group
       name
     }
   }
