@@ -1,0 +1,15 @@
+mutation {	 
+  createMulchOrder(order: {		 
+    orderId: "d0305478-eb07-4034-aavb-7e5981429c05"		 
+    ownerId: "vikasg"		 
+    amountTotalCollected: "24.24"		 
+    amountFromDonations: "24.24"		 
+    amountFromCashCollected: "24.24"		 
+    customer: {			 
+      name: "Aidan Hamilton"			 
+      addr1: "2116 Fall Creek Dr"			 
+      phone: "555-867-5309"			 
+      neighborhood: ""		 
+    }	
+  })
+}

@@ -642,6 +642,21 @@ func CreateMulchOrder(order MulchOrderType) (string, error) {
 	if 0 == len(order.OwnerId) {
 		return "", errors.New("ownerId must be provided for a new record")
 	}
+	if 0 == len(order.Customer.Neighborhood) or "none" == order.Customer.Neighborhood {
+		return "", errors.New("Neighborhood must be provided for a new record")
+	}
+	if 0 == len(order.Customer.Name) {
+		return "", errors.New("Name must be provided for a new record")
+	}
+	if 0 == len(order.Customer.Addr1) {
+		return "", errors.New("Address 1 must be provided for a new record")
+	}
+	if 0 == len(order.Customer.Phone) {
+		return "", errors.New("Phone must be provided for a new record")
+	}
+	if 0 == len(*order.AmountTotalCollected) {
+		return "", errors.New("Order purchases are empty and must be provided for a new record")
+	}
 	sqlFields, valIdxs, values := OrderType2Sql(order)
 
 	sqlCmd := fmt.Sprintf("insert into mulch_orders(%s) values (%s)",
