@@ -288,7 +288,7 @@ type CustomerType struct {
 	Addr2        *string
 	Phone        string
 	Email        *string
-	Neighborhood *string
+	Neighborhood string
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -621,9 +621,9 @@ func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
 		valIdx++
 	}
-	if nil != order.Customer.Neighborhood {
+	if len(order.Customer.Neighborhood) != 0 {
 		sqlFields = append(sqlFields, "customer_neighborhood")
-		values = append(values, *order.Customer.Neighborhood)
+		values = append(values, order.Customer.Neighborhood)
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
 		valIdx++
 	}
