@@ -15,6 +15,7 @@ import (
 	"github.com/cch71/T27FundraisingLambda/frgql"
 	"github.com/joho/godotenv"
 	"github.com/sethvargo/go-password/password"
+	"github.com/xuri/excelize/v2"
 )
 
 ////////////////////////////////////////////////////////////////////////////
@@ -50,7 +51,7 @@ func makeGqlReq(gqlFn *string) {
 
 var usersGql = `
 mutation {
-    setUsers(users: [{
+    addUsers(users: [{
 ***USERS***
     }])
 }
@@ -58,29 +59,13 @@ mutation {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func troopMaster2Gql(fnIn *string, fnOut *string, csvFnOut *string) {
-
+func userInfo2Gql(users *[]frgql.UserInfo, fnOut *string, csvFnOut *string) {
 	orecs := [][]string{
 		{"PatrolName", "FullName", "UserID", "Password"},
 	}
 	gqlUserEntries := []string{}
 
-	csvFile, err := os.ReadFile(*fnIn)
-	if err != nil {
-		log.Panic("Failed opening file: ", *fnIn, " Err: ", err)
-	}
-	r := csv.NewReader(strings.NewReader(string(csvFile)))
-	// skip first line
-	if _, err := r.Read(); err != nil {
-		log.Fatal(err)
-	}
-
-	recs, err := r.ReadAll()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, rec := range recs {
+	for _, user := range *users {
 		pw, err := password.Generate(24, 5, 5, false, false)
 		if err != nil {
 			log.Fatal(err)
@@ -98,14 +83,14 @@ func troopMaster2Gql(fnIn *string, fnOut *string, csvFnOut *string) {
 
 		// log.Printf("Generated Password: ", pw)
 
-		userid := strings.ToLower(string(rec[0][0]) + rec[1])
-		fullName := fmt.Sprint(rec[0], " ", rec[1])
+		userid := user.Id
+		fullName := user.Name
 		entry := fmt.Sprint("        id: \"", userid, "\"\n")
 		entry = entry + fmt.Sprint("        password: \"", pw, "\"\n")
-		entry = entry + fmt.Sprint("        group: \"", rec[3], "\"\n")
+		entry = entry + fmt.Sprint("        group: \"", user.Group, "\"\n")
 		entry = entry + fmt.Sprint("        name: \"", fullName, "\"")
 		gqlUserEntries = append(gqlUserEntries, entry)
-		orecs = append(orecs, []string{rec[3], fullName, userid + "@bsatroop27.us", pw})
+		orecs = append(orecs, []string{user.Group, fullName, userid + "@bsatroop27.us", pw})
 		// fmt.Println(record)
 	}
 	gqlOut := strings.ReplaceAll(usersGql, "***USERS***", strings.Join(gqlUserEntries, "\n    },{\n"))
@@ -113,12 +98,10 @@ func troopMaster2Gql(fnIn *string, fnOut *string, csvFnOut *string) {
 	os.WriteFile(*fnOut, []byte(gqlOut), 0666)
 
 	f, err := os.Create(*csvFnOut)
-	defer f.Close()
-
 	if err != nil {
-
 		log.Fatalln("failed to open file", err)
 	}
+	defer f.Close()
 
 	w := csv.NewWriter(f)
 	defer w.Flush()
@@ -128,6 +111,61 @@ func troopMaster2Gql(fnIn *string, fnOut *string, csvFnOut *string) {
 			log.Fatalln("error writing record to file", err)
 		}
 	}
+
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func xlsx2Gql(fnIn *string, fnOut *string, csvFnOut *string) {
+	f, err := excelize.OpenFile(*fnIn)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer f.Close()
+	rows, err := f.GetRows("Final Roster")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	users := []frgql.UserInfo{}
+	for idx, row := range rows {
+		log.Println(row)
+		if strings.HasPrefix(row[0], "New Scouts joined") || 0 == idx {
+			continue
+		}
+		userid := strings.ToLower(string(row[0][0]) + row[1])
+		fullName := fmt.Sprint(row[0], " ", row[1])
+		users = append(users, frgql.UserInfo{Name: fullName, Id: userid, Group: row[3]})
+	}
+	userInfo2Gql(&users, fnOut, csvFnOut)
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func troopMaster2Gql(fnIn *string, fnOut *string, csvFnOut *string) {
+
+	csvFile, err := os.ReadFile(*fnIn)
+	if err != nil {
+		log.Panic("Failed opening file: ", *fnIn, " Err: ", err)
+	}
+	r := csv.NewReader(strings.NewReader(string(csvFile)))
+	// skip first line
+	if _, err := r.Read(); err != nil {
+		log.Fatal(err)
+	}
+
+	recs, err := r.ReadAll()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	users := []frgql.UserInfo{}
+
+	for _, rec := range recs {
+		userid := strings.ToLower(string(rec[0][0]) + rec[1])
+		fullName := fmt.Sprint(rec[0], " ", rec[1])
+		users = append(users, frgql.UserInfo{Name: fullName, Id: userid, Group: rec[3]})
+	}
+	userInfo2Gql(&users, fnOut, csvFnOut)
 
 }
 
@@ -220,6 +258,7 @@ func main() {
 
 	gqlFilenamePtr := flag.String("gql", "", "GraphGQ File")
 	troopMasterInFilenamePtr := flag.String("troopmaster", "", "TroopMaster CSV user file name")
+	usersXlsxInFilenamePtr := flag.String("usersxlsx", "", "Users XLSX file name")
 	gqlFileNameOut := flag.String("outgql", "", "Filenmae for gql output required with troopmaster flag")
 	csvFileNameOut := flag.String("outcsv", "", "Filenmae for csv output required with troopmaster flag")
 	doGetAdminToken := flag.Bool("useadmintoken", false, "Sets config token")
@@ -234,6 +273,8 @@ func main() {
 		makeGqlReq(gqlFilenamePtr)
 	} else if len(*troopMasterInFilenamePtr) > 0 && len(*gqlFileNameOut) > 0 && len(*csvFileNameOut) > 0 {
 		troopMaster2Gql(troopMasterInFilenamePtr, gqlFileNameOut, csvFileNameOut)
+	} else if len(*usersXlsxInFilenamePtr) > 0 && len(*gqlFileNameOut) > 0 && len(*csvFileNameOut) > 0 {
+		xlsx2Gql(usersXlsxInFilenamePtr, gqlFileNameOut, csvFileNameOut)
 	} else {
 		log.Fatal("Invalid cli flag combination")
 		flag.PrintDefaults()

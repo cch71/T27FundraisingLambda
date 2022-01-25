@@ -1,6 +1,6 @@
 
 mutation {
-  setUsers(users: [{
+  addUsers(users: [{
     id: "fradmin"
     group: "Bear"
     name: "Super User"
