@@ -1,6 +1,7 @@
 package frgql
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 
@@ -9,8 +10,8 @@ import (
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func MakeGqlQuery(gql string) ([]byte, error) {
-	params := graphql.Params{Schema: FrSchema, RequestString: gql}
+func MakeGqlQuery(ctx context.Context, gql string) ([]byte, error) {
+	params := graphql.Params{Schema: FrSchema, RequestString: gql, Context: ctx}
 	r := graphql.Do(params)
 	if len(r.Errors) > 0 {
 		log.Printf("failed to execute graphql operation, errors: %+v", r.Errors)

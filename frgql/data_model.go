@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang-jwt/jwt"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/shopspring/decimal"
@@ -81,6 +82,80 @@ func makeDbConnection() (*pgxpool.Pool, error) {
 	}
 	// defer conn.Close()
 	return conn, nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+// Define some custom types were going to use within our tokens
+type T27FrAppMetaClaims struct {
+	FullName string `json:"full_name"`
+}
+
+type T27FrClaims struct {
+	Email   string             `json:"https://www.bsatroop27.us/email"`
+	Roles   []string           `json:"https://www.bsatroop27.us/roles"`
+	AppMeta T27FrAppMetaClaims `json:"https://www.bsatroop27.us/app_metadata"`
+	jwt.StandardClaims
+}
+
+func (claims *T27FrClaims) isAdmin() bool {
+	for _, role := range claims.Roles {
+		if "FrAdmins" == role {
+			return true
+		}
+	}
+	return false
+}
+
+func (claims *T27FrClaims) doesUidMatch(uid string) bool {
+	return strings.Split(claims.Email, "@")[0] == uid
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func parseTokenClaimsFromCtx(ctx context.Context) (*T27FrClaims, error) {
+	if v := ctx.Value("T27FrAuthorization"); v != nil {
+
+		// Parse the token
+		token, _, _ := new(jwt.Parser).ParseUnverified(v.(string), &T27FrClaims{})
+
+		if claims, ok := token.Claims.(*T27FrClaims); ok {
+			//log.Println(claims)
+			return claims, nil
+		}
+	} else {
+		return nil, errors.New("Not Authorized: Required token not found")
+	}
+
+	return nil, errors.New("Not Authorized: Invalid token")
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func verifyAdminTokenFromCtx(ctx context.Context) error {
+	claims, err := parseTokenClaimsFromCtx(ctx)
+	if err != nil {
+		return err
+	}
+
+	if !claims.isAdmin() {
+		return errors.New("Not Authorized: Not and admin user")
+	}
+	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func isUserAllowedFromCtx(ctx context.Context, uid string) (bool, error) {
+	claims, err := parseTokenClaimsFromCtx(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	if claims.isAdmin() {
+		return true, nil
+	}
+
+	return claims.doesUidMatch(uid), nil
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -849,9 +924,13 @@ func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func SetFundraiserConfig(frConfig FrConfigType) (bool, error) {
+func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, error) {
 	frConfig.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
 	log.Println("Setting Fundraiding Config: ", frConfig)
+
+	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
 
 	// Reality is they need to set the entire row every time right now so
 	//  this should probably be all required fields
@@ -944,7 +1023,13 @@ type MulchTimecardType struct {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func GetMulchTimeCards(id string) []MulchTimecardType {
+func GetMulchTimeCards(ctx context.Context, id string) ([]MulchTimecardType, error) {
+	timecards := []MulchTimecardType{}
+
+	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+		return timecards, err
+	}
+
 	doQuery := func(id string) (pgx.Rows, error) {
 		if len(id) == 0 {
 			log.Println("Retrieving All Timecards")
@@ -957,12 +1042,12 @@ func GetMulchTimeCards(id string) []MulchTimecardType {
 		}
 	}
 
-	timecards := []MulchTimecardType{}
 	rows, err := doQuery(id)
 	if err != nil {
 		log.Println("Timecard query Failed", err)
-		return timecards
+		return timecards, nil
 	}
+
 	defer rows.Close()
 
 	for rows.Next() {
@@ -978,9 +1063,9 @@ func GetMulchTimeCards(id string) []MulchTimecardType {
 
 	if rows.Err() != nil {
 		log.Println("Reading timecard rows had an issue: ", err)
-		return []MulchTimecardType{}
+		return []MulchTimecardType{}, nil
 	}
-	return timecards
+	return timecards, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -1113,9 +1198,13 @@ func createUser(user *UserInfo, jwt *string) error {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func AddUsers(users []UserInfo, jwt string) (bool, error) {
+func AddUsers(ctx context.Context, users []UserInfo, jwt string) (bool, error) {
 	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
 	log.Println("Setting Users at: ", lastModifiedTime)
+
+	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
 
 	// Start Database Operations
 	trxn, err := Db.Begin(context.Background())
@@ -1272,5 +1361,18 @@ func SetSpreaders(orderId string, spreaders []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	return true, nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func AdminTestApi(ctx context.Context, param1 string) (bool, error) {
+	log.Println("Admin Test API")
+
+	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+
+	}
+	log.Println("Worked")
 	return true, nil
 }

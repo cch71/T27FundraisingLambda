@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"flag"
@@ -20,7 +21,7 @@ import (
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func makeGqlReq(gqlFn *string) {
+func makeGqlReq(ctx context.Context, gqlFn *string) {
 	query, err := os.ReadFile(*gqlFn)
 	if err != nil {
 		log.Panic("Failed opening file: ", *gqlFn, " Err: ", err)
@@ -31,7 +32,7 @@ func makeGqlReq(gqlFn *string) {
 	}
 	defer frgql.CloseDb()
 
-	rJSON, err := frgql.MakeGqlQuery(string(query))
+	rJSON, err := frgql.MakeGqlQuery(ctx, string(query))
 	if err != nil {
 		log.Panic("GraphQL Query Failed: ", err)
 	}
@@ -252,7 +253,7 @@ func getUsers(jwt *Jwt) {
 ////////////////////////////////////////////////////////////////////////////
 //
 func main() {
-
+	ctx := context.Background()
 	credentialsFile := path.Join(os.Getenv("HOME"), ".t27fr", "credentials")
 	_ = godotenv.Load(credentialsFile)
 
@@ -269,8 +270,10 @@ func main() {
 		os.Setenv("AUTH0_ADMIN_TOKEN", jwt.Token)
 	}
 
+	ctx = context.WithValue(ctx, "T27FrAuthorization", os.Getenv("AUTH_TOKEN"))
+
 	if len(*gqlFilenamePtr) > 0 {
-		makeGqlReq(gqlFilenamePtr)
+		makeGqlReq(ctx, gqlFilenamePtr)
 	} else if len(*troopMasterInFilenamePtr) > 0 && len(*gqlFileNameOut) > 0 && len(*csvFileNameOut) > 0 {
 		troopMaster2Gql(troopMasterInFilenamePtr, gqlFileNameOut, csvFileNameOut)
 	} else if len(*usersXlsxInFilenamePtr) > 0 && len(*gqlFileNameOut) > 0 && len(*csvFileNameOut) > 0 {

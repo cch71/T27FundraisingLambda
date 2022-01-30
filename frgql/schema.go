@@ -340,7 +340,7 @@ func init() {
 		Description: "Retrieves Timecards for Mulch Delivery",
 		Args: graphql.FieldConfigArgument{
 			"id": &graphql.ArgumentConfig{
-				Description: "The id for which data should be returned.  If empty then all orders are returned",
+				Description: "The id for which data should be returned.  If empty then all timecards will be returned",
 				Type:        graphql.String,
 			},
 		},
@@ -350,7 +350,7 @@ func init() {
 			if val, ok := p.Args["id"]; ok {
 				id = val.(string)
 			}
-			return GetMulchTimeCards(id), nil
+			return GetMulchTimeCards(p.Context, id)
 		},
 	}
 
@@ -415,7 +415,7 @@ func init() {
 				log.Println("Error decoding JSON to userinfo")
 				return nil, nil
 			}
-			return AddUsers(users, token)
+			return AddUsers(p.Context, users, token)
 		},
 	}
 
@@ -540,7 +540,7 @@ func init() {
 
 			frConfig := FrConfigType{}
 			json.Unmarshal([]byte(jsonString), &frConfig)
-			return SetFundraiserConfig(frConfig)
+			return SetFundraiserConfig(p.Context, frConfig)
 		},
 	}
 
@@ -682,10 +682,19 @@ func init() {
 		},
 	}
 
-	// rootQuery := graphql.ObjectConfig{
-	// 	Name:   "Query",
-	// 	Fields: graphql.Fields(queryFields),
-	// }
+	queryFields["testApi"] = &graphql.Field{
+		Type:        graphql.Boolean,
+		Description: "",
+		Args: graphql.FieldConfigArgument{
+			"param1": &graphql.ArgumentConfig{
+				Description: "",
+				Type:        graphql.NewNonNull(graphql.String),
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			return AdminTestApi(p.Context, p.Args["param1"].(string))
+		},
+	}
 
 	schemaConfig := graphql.SchemaConfig{
 		Query:    graphql.NewObject(graphql.ObjectConfig{Name: "Query", Fields: graphql.Fields(queryFields)}),

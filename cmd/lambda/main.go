@@ -20,7 +20,8 @@ type LambdaRequestBody struct {
 ////////////////////////////////////////////////////////////////////////////
 //
 type LambdaRequest struct {
-	Body string `json:"body"`
+	Body    string            `json:"body"`
+	Headers map[string]string `json:"headers,omitempty"`
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -54,7 +55,7 @@ func generateOkResp(body string) LambdaResponse {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func HandleLambdaEvent(_ctx context.Context, event LambdaRequest) (LambdaResponse, error) {
+func HandleLambdaEvent(ctx context.Context, event LambdaRequest) (LambdaResponse, error) {
 	//if dbconn not already established then RwLock to go ahead and try once sync.Once
 	//check authorization
 	//run query
@@ -64,11 +65,14 @@ func HandleLambdaEvent(_ctx context.Context, event LambdaRequest) (LambdaRespons
 		return generateResp("", http.StatusInternalServerError), err
 	}
 	log.Println("Rxed GraphQL Query: ", event)
+	if bearerToken, prs := event.Headers["Authorization"]; prs {
+		ctx = context.WithValue(ctx, "T27FrAuthorization", bearerToken[len("Bearer "):])
+	}
 
 	body := LambdaRequestBody{}
 	json.Unmarshal([]byte(event.Body), &body)
 
-	respBody, err := frgql.MakeGqlQuery(body.Query)
+	respBody, err := frgql.MakeGqlQuery(ctx, body.Query)
 	if err != nil {
 		log.Println("GraphQL Query Failed: ", err)
 		return generateResp("", http.StatusBadRequest), err
