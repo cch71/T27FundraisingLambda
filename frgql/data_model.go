@@ -106,8 +106,12 @@ func (claims *T27FrClaims) isAdmin() bool {
 	return false
 }
 
+func (claims *T27FrClaims) userId() string {
+	return strings.Split(claims.Email, "@")[0]
+}
+
 func (claims *T27FrClaims) doesUidMatch(uid string) bool {
-	return strings.Split(claims.Email, "@")[0] == uid
+	return claims.userId() == uid
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -138,24 +142,30 @@ func verifyAdminTokenFromCtx(ctx context.Context) error {
 	}
 
 	if !claims.isAdmin() {
-		return errors.New("Not Authorized: Not and admin user")
+		return errors.New("Not Authorized: Not an admin user")
 	}
 	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func isUserAllowedFromCtx(ctx context.Context, uid string) (bool, error) {
+func verifyUidAllowedFromCtx(ctx context.Context, uid string) error {
 	claims, err := parseTokenClaimsFromCtx(ctx)
 	if err != nil {
-		return false, err
+		return err
 	}
 
+	// User is admin so of course
 	if claims.isAdmin() {
-		return true, nil
+		return nil
 	}
 
-	return claims.doesUidMatch(uid), nil
+	if !claims.doesUidMatch(uid) {
+		return errors.New(fmt.Sprintf(
+			"Not Authorized: User is not admin and id does not match. Asking: %s Found: %s",
+			uid, claims.userId()))
+	}
+	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -708,7 +718,7 @@ func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func CreateMulchOrder(order MulchOrderType) (string, error) {
+func CreateMulchOrder(ctx context.Context, order MulchOrderType) (string, error) {
 	log.Println("Creating Order: ", order)
 
 	if 0 == len(order.OrderId) {
@@ -717,6 +727,11 @@ func CreateMulchOrder(order MulchOrderType) (string, error) {
 	if 0 == len(order.OwnerId) {
 		return "", errors.New("ownerId must be provided for a new record")
 	}
+
+	if err := verifyUidAllowedFromCtx(ctx, order.OwnerId); err != nil {
+		return "", err
+	}
+
 	if 0 == len(order.Customer.Neighborhood) || "none" == order.Customer.Neighborhood {
 		return "", errors.New("Neighborhood must be provided for a new record")
 	}
@@ -748,7 +763,7 @@ func CreateMulchOrder(order MulchOrderType) (string, error) {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func UpdateMulchOrder(order MulchOrderType) (bool, error) {
+func UpdateMulchOrder(ctx context.Context, order MulchOrderType) (bool, error) {
 	log.Println("Updating Order: ", order)
 
 	if 0 == len(order.OrderId) {
@@ -757,6 +772,11 @@ func UpdateMulchOrder(order MulchOrderType) (bool, error) {
 	if 0 == len(order.OwnerId) {
 		return false, errors.New("ownerId must be provided for updated record")
 	}
+
+	if err := verifyUidAllowedFromCtx(ctx, order.OwnerId); err != nil {
+		return false, err
+	}
+
 	//This was actually only updating the specified fields not updating the optional ones so changing to
 	// delete existing record and adding new one
 	/*
@@ -818,8 +838,24 @@ func UpdateMulchOrder(order MulchOrderType) (bool, error) {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func DeleteMulchOrder(orderId string) (bool, error) {
+func DeleteMulchOrder(ctx context.Context, orderId string) (bool, error) {
 	log.Println("Deleteing Order with order id: ", orderId)
+
+	// Because we want to validate that the order owner or admin are the only 2 people that can delete
+	//  we have to pull the order up first to get the original order id
+	sqlCmd := "select order_owner_id::string from mulch_orders where mulch_orders.order_id=$1"
+	log.Println("SqlCmd: ", sqlCmd)
+
+	var orderOwner string
+	if err := Db.QueryRow(context.Background(), sqlCmd, orderId).Scan(&orderOwner); err != nil {
+		log.Println("Delete Mulch order query for: ", orderId, " failed because:", err)
+		return false, err
+	}
+
+	if err := verifyUidAllowedFromCtx(ctx, orderOwner); err != nil {
+		return false, err
+	}
+
 	_, err := Db.Exec(context.Background(), "delete from mulch_orders where order_id=$1", orderId)
 	if err != nil {
 		return false, err
@@ -1369,9 +1405,8 @@ func SetSpreaders(orderId string, spreaders []string) (bool, error) {
 func AdminTestApi(ctx context.Context, param1 string) (bool, error) {
 	log.Println("Admin Test API")
 
-	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+	if err := verifyUidAllowedFromCtx(ctx, param1); err != nil {
 		return false, err
-
 	}
 	log.Println("Worked")
 	return true, nil

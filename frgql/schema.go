@@ -201,7 +201,7 @@ func init() {
 
 			newMulchOrder := MulchOrderType{}
 			json.Unmarshal([]byte(jsonString), &newMulchOrder)
-			return CreateMulchOrder(newMulchOrder)
+			return CreateMulchOrder(p.Context, newMulchOrder)
 		},
 	}
 
@@ -223,7 +223,7 @@ func init() {
 
 			updatedMulchOrder := MulchOrderType{}
 			json.Unmarshal([]byte(jsonString), &updatedMulchOrder)
-			return UpdateMulchOrder(updatedMulchOrder)
+			return UpdateMulchOrder(p.Context, updatedMulchOrder)
 		},
 	}
 
@@ -237,7 +237,7 @@ func init() {
 			},
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			return DeleteMulchOrder(p.Args["orderId"].(string))
+			return DeleteMulchOrder(p.Context, p.Args["orderId"].(string))
 		},
 	}
 
