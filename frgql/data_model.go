@@ -1402,12 +1402,12 @@ func SetSpreaders(orderId string, spreaders []string) (bool, error) {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func AdminTestApi(ctx context.Context, param1 string) (bool, error) {
-	log.Println("Admin Test API")
-
-	if err := verifyUidAllowedFromCtx(ctx, param1); err != nil {
-		return false, err
-	}
-	log.Println("Worked")
-	return true, nil
-}
+// func AdminTestApi(ctx context.Context, param1 string) (bool, error) {
+// 	log.Println("Admin Test API")
+//
+// 	if err := verifyUidAllowedFromCtx(ctx, param1); err != nil {
+// 		return false, err
+// 	}
+// 	log.Println("Worked")
+// 	return true, nil
+// }

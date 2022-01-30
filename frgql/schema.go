@@ -682,19 +682,19 @@ func init() {
 		},
 	}
 
-	queryFields["testApi"] = &graphql.Field{
-		Type:        graphql.Boolean,
-		Description: "",
-		Args: graphql.FieldConfigArgument{
-			"param1": &graphql.ArgumentConfig{
-				Description: "",
-				Type:        graphql.NewNonNull(graphql.String),
-			},
-		},
-		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			return AdminTestApi(p.Context, p.Args["param1"].(string))
-		},
-	}
+	// queryFields["testApi"] = &graphql.Field{
+	// 	Type:        graphql.Boolean,
+	// 	Description: "",
+	// 	Args: graphql.FieldConfigArgument{
+	// 		"param1": &graphql.ArgumentConfig{
+	// 			Description: "",
+	// 			Type:        graphql.NewNonNull(graphql.String),
+	// 		},
+	// 	},
+	// 	Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+	// 		return AdminTestApi(p.Context, p.Args["param1"].(string))
+	// 	},
+	// }
 
 	schemaConfig := graphql.SchemaConfig{
 		Query:    graphql.NewObject(graphql.ObjectConfig{Name: "Query", Fields: graphql.Fields(queryFields)}),
