@@ -47,7 +47,7 @@ func makeGqlReq(ctx context.Context, gqlFn *string) {
 		log.Panic("Indenting results failed: ", err)
 	}
 
-	log.Printf("%s", rJSON)
+	log.Printf("JSON Resp:\n%s", rJSON)
 }
 
 var usersGql = `
@@ -283,4 +283,5 @@ func main() {
 		flag.PrintDefaults()
 	}
 
+	log.Println("Done")
 }

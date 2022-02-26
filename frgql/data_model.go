@@ -818,12 +818,14 @@ func UpdateMulchOrder(ctx context.Context, order MulchOrderType) (bool, error) {
 	log.Println("Deleting order for update: ", order.OrderId)
 	_, err = trxn.Exec(context.Background(), "delete from mulch_orders where order_id = $1", order.OrderId)
 	if err != nil {
-		log.Println("Failed to delete order for updating. record may not exist: ", order.OrderId)
-		//return false, err
+		trxn.Rollback(context.Background())
+		log.Println("Failed to delete order for updating: ", order.OrderId, " failed because: ", err)
+		return false, err
 	}
 	log.Println("Updating(by inserting) Order sqlCmd: ", sqlCmd)
 	_, err = trxn.Exec(context.Background(), sqlCmd, values...)
 	if err != nil {
+		trxn.Rollback(context.Background())
 		return false, err
 	}
 
@@ -1034,11 +1036,13 @@ func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, erro
 	log.Println("Deleting existing record")
 	_, err = trxn.Exec(context.Background(), "delete from fundraiser_config")
 	if err != nil {
+		trxn.Rollback(context.Background())
 		return false, err
 	}
 	log.Println("Setting Config SqlCmd: ", sqlCmd)
 	_, err = trxn.Exec(context.Background(), sqlCmd, values...)
 	if err != nil {
+		trxn.Rollback(context.Background())
 		return false, err
 	}
 
@@ -1083,17 +1087,17 @@ func UpdateFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, e
 ////////////////////////////////////////////////////////////////////////////
 //
 type MulchTimecardType struct {
-	Id               string
-	DeliveryId       int
-	LastModifiedTime time.Time
-	TimeIn           string
-	TimeOut          string
-	TimeTotal        string
+	Id               string `json:"id"`
+	DeliveryId       int    `json:"deliveryId"`
+	LastModifiedTime string `json:"lastModifiedTime,omitempty"`
+	TimeIn           string `json:"timeIn"`
+	TimeOut          string `json:"timeOut"`
+	TimeTotal        string `json:"timeTotal"`
 }
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func GetMulchTimeCards(ctx context.Context, id string) ([]MulchTimecardType, error) {
+func GetMulchTimecards(ctx context.Context, id string) ([]MulchTimecardType, error) {
 	timecards := []MulchTimecardType{}
 
 	if err := verifyAdminTokenFromCtx(ctx); err != nil {
@@ -1103,11 +1107,11 @@ func GetMulchTimeCards(ctx context.Context, id string) ([]MulchTimecardType, err
 	doQuery := func(id string) (pgx.Rows, error) {
 		if len(id) == 0 {
 			log.Println("Retrieving All Timecards")
-			sqlCmd := `select uid, delivery_id, last_modified_time, time_in::string, time_out::string, time_total::string from mulch_delivery_timecards`
+			sqlCmd := `select uid, delivery_id, last_modified_time::string, time_in::string, time_out::string, time_total::string from mulch_delivery_timecards`
 			return Db.Query(context.Background(), sqlCmd)
 		} else {
 			log.Println("Retrieving Timecards for: ", id)
-			sqlCmd := `select uid, delivery_id, last_modified_time, time_in::string, time_out::string, time_total::string from mulch_delivery_timecards where uid=$1`
+			sqlCmd := `select uid, delivery_id, last_modified_time::string, time_in::string, time_out::string, time_total::string from mulch_delivery_timecards where uid=$1`
 			return Db.Query(context.Background(), sqlCmd, id)
 		}
 	}
@@ -1136,6 +1140,53 @@ func GetMulchTimeCards(ctx context.Context, id string) ([]MulchTimecardType, err
 		return []MulchTimecardType{}, nil
 	}
 	return timecards, nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func SetMulchTimecards(ctx context.Context, timecards []MulchTimecardType) (bool, error) {
+	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
+	log.Println("Setting Timecards at: ", lastModifiedTime)
+
+	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
+	// Start Database Operations
+	trxn, err := Db.Begin(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	for _, timecard := range timecards {
+		log.Println("Deleting existing record if it exists: ", timecard.Id)
+		_, err = trxn.Exec(context.Background(),
+			"delete from mulch_delivery_timecards where uid = $1 and delivery_id = $2",
+			timecard.Id, timecard.DeliveryId)
+		if err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
+		if len(timecard.TimeTotal) > 0 && timecard.TimeTotal != "00:00:00" {
+			sqlCmd := "insert into mulch_delivery_timecards(uid, delivery_id, last_modified_time, time_in, time_out, time_total) " +
+				"values ($1, $2, $3::timestamp, $4::time, $5::time, $6::time)"
+			log.Println("Setting Timecard SqlCmd: ", sqlCmd)
+			_, err = trxn.Exec(context.Background(), sqlCmd,
+				timecard.Id, timecard.DeliveryId, lastModifiedTime, timecard.TimeIn, timecard.TimeOut, timecard.TimeTotal)
+			if err != nil {
+				trxn.Rollback(context.Background())
+				return false, err
+			}
+		}
+	}
+
+	log.Println("About to make a commitment")
+	err = trxn.Commit(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -1286,6 +1337,7 @@ func AddUsers(ctx context.Context, users []UserInfo, jwt string) (bool, error) {
 		log.Println("Deleting existing record if it exists")
 		_, err = trxn.Exec(context.Background(), "delete from users where id = $1", user.Id)
 		if err != nil {
+			trxn.Rollback(context.Background())
 			return false, err
 		}
 
@@ -1293,6 +1345,7 @@ func AddUsers(ctx context.Context, users []UserInfo, jwt string) (bool, error) {
 		log.Println("Adding user SqlCmd: ", sqlCmd)
 		_, err = trxn.Exec(context.Background(), sqlCmd, user.Id, user.Name, user.Group)
 		if err != nil {
+			trxn.Rollback(context.Background())
 			return false, err
 		}
 	}
@@ -1300,6 +1353,7 @@ func AddUsers(ctx context.Context, users []UserInfo, jwt string) (bool, error) {
 	sqlCmd2 := "UPDATE fundraiser_config SET last_modified_time=$1::timestamp WHERE last_modified_time=(SELECT last_modified_time FROM fundraiser_config LIMIT 1)"
 	_, err = trxn.Exec(context.Background(), sqlCmd2, lastModifiedTime)
 	if err != nil {
+		trxn.Rollback(context.Background())
 		return false, err
 	}
 
@@ -1415,6 +1469,7 @@ func SetSpreaders(orderId string, spreaders []string) (bool, error) {
 	log.Println("Deleting existing record")
 	_, err = trxn.Exec(context.Background(), "delete from mulch_spreaders where order_id = $1", orderId)
 	if err != nil {
+		trxn.Rollback(context.Background())
 		return false, err
 	}
 
@@ -1422,6 +1477,7 @@ func SetSpreaders(orderId string, spreaders []string) (bool, error) {
 		sqlCmd := "insert into mulch_spreaders(order_id, spreaders) values ($1, $2::jsonb)"
 		_, err = trxn.Exec(context.Background(), sqlCmd, orderId, spreaders)
 		if err != nil {
+			trxn.Rollback(context.Background())
 			return false, err
 		}
 	}

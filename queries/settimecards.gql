@@ -1,0 +1,10 @@
+
+mutation {
+  setMulchTimecards(timecards: [{
+    id: "fruser1",
+    deliveryId: 1,
+    timeIn: "08:00:00",
+    timeOut: "18:00:00",
+    timeTotal: "10:00:00"
+  }])
+}

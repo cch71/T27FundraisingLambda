@@ -1,3 +1,10 @@
 {
-  testApi(param1: "Hello") {} 
+  mulchTimecards{
+    id,
+    lastModifiedTime,
+    deliveryId
+    timeIn
+    timeOut
+    timeTotal
+  }
 }

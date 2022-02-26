@@ -51,21 +51,6 @@ func init() {
 	mutationFields := make(map[string]*graphql.Field)
 
 	//////////////////////////////////////////////////////////////////////////////
-	// Mulch Timecard Common Types
-	mulchTimecardType := graphql.NewObject(graphql.ObjectConfig{
-		Name:        "MulchTimecardType",
-		Description: "Mulch Timecard Record Type",
-		Fields: graphql.Fields{
-			"id":               &graphql.Field{Type: graphql.String},
-			"lastModifiedTime": &graphql.Field{Type: graphql.String},
-			"deliveryId":       &graphql.Field{Type: graphql.Int},
-			"timeIn":           &graphql.Field{Type: graphql.String},
-			"timeOut":          &graphql.Field{Type: graphql.String},
-			"timeTotal":        &graphql.Field{Type: graphql.String},
-		},
-	})
-
-	//////////////////////////////////////////////////////////////////////////////
 	// Order Common Types
 	customerType := graphql.NewObject(graphql.ObjectConfig{
 		Name:        "CustomerType",
@@ -333,10 +318,26 @@ func init() {
 			return GetMulchOrders(params), nil
 		},
 	}
+
+	//////////////////////////////////////////////////////////////////////////////
+	// Mulch Timecard Common Types
+	timecardType := graphql.NewObject(graphql.ObjectConfig{
+		Name:        "MulchTimecardType",
+		Description: "Mulch Timecard Record Type",
+		Fields: graphql.Fields{
+			"id":               &graphql.Field{Type: graphql.String},
+			"lastModifiedTime": &graphql.Field{Type: graphql.String},
+			"deliveryId":       &graphql.Field{Type: graphql.Int},
+			"timeIn":           &graphql.Field{Type: graphql.String},
+			"timeOut":          &graphql.Field{Type: graphql.String},
+			"timeTotal":        &graphql.Field{Type: graphql.String},
+		},
+	})
+
 	//////////////////////////////////////////////////////////////////////////////
 	// Timecard Query Types
-	queryFields["mulchTimeCards"] = &graphql.Field{
-		Type:        graphql.NewList(mulchTimecardType),
+	queryFields["mulchTimecards"] = &graphql.Field{
+		Type:        graphql.NewList(timecardType),
 		Description: "Retrieves Timecards for Mulch Delivery",
 		Args: graphql.FieldConfigArgument{
 			"id": &graphql.ArgumentConfig{
@@ -350,14 +351,52 @@ func init() {
 			if val, ok := p.Args["id"]; ok {
 				id = val.(string)
 			}
-			return GetMulchTimeCards(p.Context, id)
+			return GetMulchTimecards(p.Context, id)
+		},
+	}
+
+	timecardInputType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name:        "MulchTimecardInputType",
+		Description: "Mulch Timecard Input Entry",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"id":         &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"deliveryId": &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"timeIn":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"timeOut":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"timeTotal":  &graphql.InputObjectFieldConfig{Type: graphql.String},
+		},
+	})
+
+	mutationFields["setMulchTimecards"] = &graphql.Field{
+		Type:        graphql.Boolean,
+		Description: "Sets timecard record",
+		Args: graphql.FieldConfigArgument{
+			"timecards": &graphql.ArgumentConfig{
+				Description: "List of timecards to record",
+				Type:        graphql.NewList(timecardInputType),
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// log.Println("Setting Config: ", p.Args["config"])
+
+			jsonString, err := json.Marshal(p.Args["timecards"])
+			if err != nil {
+				log.Println("Error encoding JSON")
+				return nil, nil
+			}
+			timecards := []MulchTimecardType{}
+			if err := json.Unmarshal([]byte(jsonString), &timecards); err != nil {
+				log.Println("Error decoding JSON to timecards")
+				return nil, nil
+			}
+			return SetMulchTimecards(p.Context, timecards)
 		},
 	}
 
 	//////////////////////////////////////////////////////////////////////////////
 	// User/Group Query/Input Types
 	userInfoType := graphql.NewObject(graphql.ObjectConfig{
-		Name:        "userInfoType",
+		Name:        "UserInfoType",
 		Description: "User Info Type",
 		Fields: graphql.Fields{
 			"name":  &graphql.Field{Type: graphql.String},
@@ -375,7 +414,7 @@ func init() {
 	}
 
 	userInputType := graphql.NewInputObject(graphql.InputObjectConfig{
-		Name:        "userInfoInputType",
+		Name:        "UserInfoInputType",
 		Description: "Fundraiser user",
 		Fields: graphql.InputObjectConfigFieldMap{
 			"name":     &graphql.InputObjectFieldConfig{Type: graphql.String},
