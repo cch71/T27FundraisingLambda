@@ -960,17 +960,7 @@ func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, error) {
-	frConfig.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
-	log.Println("Setting Fundraiding Config: ", frConfig)
-
-	if err := verifyAdminTokenFromCtx(ctx); err != nil {
-		return false, err
-	}
-
-	// Reality is they need to set the entire row every time right now so
-	//  this should probably be all required fields
-	//  doing it this way for future when it doesn't
+func FrConfigType2Sql(frConfig FrConfigType) ([]string, []string, []interface{}) {
 	values := []interface{}{}
 	valIdxs := []string{}
 	valIdx := 1
@@ -1017,6 +1007,20 @@ func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, erro
 	sqlFields = append(sqlFields, "last_modified_time")
 	values = append(values, frConfig.LastModifiedTime)
 	valIdxs = append(valIdxs, fmt.Sprintf("$%d::timestamp", valIdx))
+	return sqlFields, valIdxs, values
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, error) {
+	frConfig.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
+	log.Println("Setting Fundraiding Config: ", frConfig)
+
+	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
+	sqlFields, valIdxs, values := FrConfigType2Sql(frConfig)
 
 	sqlCmd := fmt.Sprintf("insert into fundraiser_config(%s) values (%s)",
 		strings.Join(sqlFields, ","), strings.Join(valIdxs, ","))
@@ -1043,6 +1047,36 @@ func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, erro
 	if err != nil {
 		return false, err
 	}
+	return true, nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func UpdateFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, error) {
+	frConfig.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
+	log.Println("Updating Fundraiding Config: ", frConfig)
+
+	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
+	sqlFields, valIdxs, values := FrConfigType2Sql(frConfig)
+
+	updateSqlFlds := []string{}
+	for i, f := range sqlFields {
+		updateSqlFlds = append(updateSqlFlds, fmt.Sprintf("%s=%s", f, valIdxs[i]))
+	}
+
+	sqlCmd := fmt.Sprintf(
+		"UPDATE fundraiser_config SET %s WHERE last_modified_time=(SELECT last_modified_time FROM fundraiser_config LIMIT 1)",
+		strings.Join(updateSqlFlds, ","))
+
+	log.Println("Update Config SqlCmd: ", sqlCmd)
+	_, err := Db.Exec(context.Background(), sqlCmd, values...)
+	if err != nil {
+		return false, err
+	}
+
 	return true, nil
 }
 

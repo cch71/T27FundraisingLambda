@@ -1,8 +1,5 @@
 mutation {
-  setConfig(config: {
-    kind: "mulch",
-    description: "Mulch",
-    isLocked: false,
+  updateConfig(config: {
     neighborhoods: [
       {
          name: "Avery Ranch",
@@ -136,42 +133,6 @@ mutation {
       },{
          name: "Out of Area West",
          distributionPoint: "Walsh"
-      }
-    ],
-    mulchDeliveryConfigs: [
-      {
-          id: 1,
-          date: "3/12/2022",
-          newOrderCutoffDate: "2/27/2022"
-      },
-      {
-          id: 2,
-          date: "4/9/2022",
-          newOrderCutoffDate: "3/21/2022"
-      }
-    ],
-    products: [
-      {
-          id: "bags",
-          label: "Bags of Mulch",
-          unitPrice: "4.65",
-          minUnits: 5,
-          priceBreaks: [
-              {
-                  gt: 15,
-                  unitPrice: "4.50"
-              },{
-                  gt: 35,
-                  unitPrice: "4.35"
-              },{
-                  gt: 64,
-                  unitPrice: "4.25"
-              }
-          ]
-      },{
-          id: "spreading",
-          label: "Bags to Spread",
-          unitPrice: "2.00"
       }
     ]
   })

@@ -543,6 +543,28 @@ func init() {
 			return SetFundraiserConfig(p.Context, frConfig)
 		},
 	}
+	mutationFields["updateConfig"] = &graphql.Field{
+		Type:        graphql.Boolean,
+		Description: "Update existing config values",
+		Args: graphql.FieldConfigArgument{
+			"config": &graphql.ArgumentConfig{
+				Description: "The config entry",
+				Type:        configInputType,
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// log.Println("Setting Config: ", p.Args["config"])
+			jsonString, err := json.Marshal(p.Args["config"])
+			if err != nil {
+				fmt.Println("Error encoding JSON")
+				return nil, nil
+			}
+
+			frConfig := FrConfigType{}
+			json.Unmarshal([]byte(jsonString), &frConfig)
+			return UpdateFundraiserConfig(p.Context, frConfig)
+		},
+	}
 
 	//////////////////////////////////////////////////////////////////////////////
 	// Adds Spreaders to order
