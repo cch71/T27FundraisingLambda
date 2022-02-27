@@ -494,7 +494,7 @@ func init() {
 	})
 	configType := graphql.NewObject(graphql.ObjectConfig{
 		Name:        "ConfigType",
-		Description: "Fundraiser config inforamation",
+		Description: "Fundraiser config information",
 		Fields: graphql.Fields{
 			"kind":                 &graphql.Field{Type: graphql.String},
 			"description":          &graphql.Field{Type: graphql.String},
@@ -549,7 +549,7 @@ func init() {
 	})
 	configInputType := graphql.NewInputObject(graphql.InputObjectConfig{
 		Name:        "ConfigType",
-		Description: "Fundraiser config inforamation",
+		Description: "Fundraiser config information",
 		Fields: graphql.InputObjectConfigFieldMap{
 			"kind":                 &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"description":          &graphql.InputObjectFieldConfig{Type: graphql.String},
@@ -672,7 +672,7 @@ func init() {
 	// Summary Query Types
 	ownerIdSummaryType := graphql.NewObject(graphql.ObjectConfig{
 		Name:        "OwnerIdSummaryType",
-		Description: "Summary inforamation for a specfic OnwerID",
+		Description: "Summary information for a specfic OnwerID",
 		Fields: graphql.Fields{
 			"totalDeliveryMinutes":                &graphql.Field{Type: graphql.Int},
 			"totalNumBagsSold":                    &graphql.Field{Type: graphql.Int},
@@ -687,7 +687,8 @@ func init() {
 			"allocationsTotal":                    &graphql.Field{Type: graphql.String},
 		},
 	})
-	queryFields["summaryByOwnerId"] = &graphql.Field{
+
+	orderOwnerSummary := graphql.Field{
 		Type:        ownerIdSummaryType,
 		Description: "Queries for Summary information based on Owner ID",
 		Args: graphql.FieldConfigArgument{
@@ -701,9 +702,12 @@ func init() {
 		},
 	}
 
+	// Deprecated for the more generic "summary" query
+	queryFields["summaryByOwnerId"] = &orderOwnerSummary
+
 	troopSummaryByGroupType := graphql.NewObject(graphql.ObjectConfig{
 		Name:        "TroopSummaryByGroupType",
-		Description: "Summary inforamation for the different patrols",
+		Description: "Summary information for the different patrols",
 		Fields: graphql.Fields{
 			"groupId":              &graphql.Field{Type: graphql.String},
 			"totalAmountCollected": &graphql.Field{Type: graphql.String},
@@ -721,7 +725,7 @@ func init() {
 
 	troopSummaryType := graphql.NewObject(graphql.ObjectConfig{
 		Name:        "TroopSummaryType",
-		Description: "Summary inforamation for the troop",
+		Description: "Summary information for the troop",
 		Fields: graphql.Fields{
 			"totalAmountCollected": &graphql.Field{Type: graphql.String},
 			"groupSummary":         &graphql.Field{Type: graphql.NewList(troopSummaryByGroupType)},
@@ -729,7 +733,7 @@ func init() {
 		},
 	})
 
-	queryFields["troopSummary"] = &graphql.Field{
+	troopSummary := graphql.Field{
 		Type:        troopSummaryType,
 		Description: "Queries for Summary information for the entire troop",
 		Args: graphql.FieldConfigArgument{
@@ -743,6 +747,51 @@ func init() {
 		},
 	}
 
+	// Deprecated for the more generic "summary" query
+	queryFields["troopSummary"] = &troopSummary
+
+	neighborhoodSummaryType := graphql.NewObject(graphql.ObjectConfig{
+		Name: "NeighborhoodSummaryType",
+		Fields: graphql.Fields{
+			"neighborhood": &graphql.Field{Type: graphql.String},
+			"numOrders":    &graphql.Field{Type: graphql.Int},
+		},
+	})
+
+	neighborhoodsSummary := graphql.Field{
+		Type:        graphql.NewList(neighborhoodSummaryType),
+		Description: "Summary information for neighborhoods",
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			return GetNeighborhoodSummary()
+		},
+	}
+
+	// Deprecated for the more generic "summary" query
+	queryFields["neighborhoodsSummary"] = &neighborhoodsSummary
+
+	summaryType := graphql.NewObject(graphql.ObjectConfig{
+		Name:        "SummaryType",
+		Description: "Summary information",
+		Fields: graphql.Fields{
+			"neighborhoods": &neighborhoodsSummary,
+			"orderOwner":    &orderOwnerSummary,
+			"troop":         &troopSummary,
+		},
+	})
+
+	queryFields["summary"] = &graphql.Field{
+		Type: summaryType,
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// graphql-go requires this shim to do sublevel queries.  Without this
+			// the sub resolves wouldn't trigger
+			type Shimmer struct {
+				Troop         TroopSummaryType
+				OrderOwner    OwnerIdSummaryType
+				Neighborhoods []NeighborhoodSummaryType
+			}
+			return Shimmer{}, nil
+		},
+	}
 	// queryFields["testApi"] = &graphql.Field{
 	// 	Type:        graphql.Boolean,
 	// 	Description: "",

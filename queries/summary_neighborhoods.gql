@@ -1,0 +1,32 @@
+{
+  summary {
+    orderOwner(ownerId: "fruser2") {
+      totalDeliveryMinutes
+      totalNumBagsSold
+      totalNumBagsSoldToSpread
+      totalAmountCollectedForDonations
+      totalAmountCollectedForBags
+      totalAmountCollectedForBagsToSpread
+      totalAmountCollected
+      allocationsFromDelivery
+      allocationsFromBagsSold
+      allocationsFromBagsSpread
+      allocationsTotal
+    }
+    troop(numTopSellers: 10) {
+      totalAmountCollected
+      topSellers {
+        totalAmountCollected
+        name
+      }
+      groupSummary {
+        groupId
+        totalAmountCollected
+      }
+    }
+    neighborhoods {
+      neighborhood
+      numOrders
+    }
+  }
+}

@@ -365,6 +365,46 @@ func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
 
 }
 
+type NeighborhoodSummaryType struct {
+	Neighborhood string `json:"neighborhood"`
+	NumOrders    int    `json:"numOrders"`
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func GetNeighborhoodSummary() ([]NeighborhoodSummaryType, error) {
+	log.Println("Getting Neighborhood Summary")
+
+	sqlCmd := "select customer_neighborhood, count(*) from mulch_orders group by customer_neighborhood"
+
+	rows, err := Db.Query(context.Background(), sqlCmd)
+	if err != nil {
+		log.Println("Neighborhood summary query failed", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := []NeighborhoodSummaryType{}
+
+	for rows.Next() {
+		result := NeighborhoodSummaryType{}
+
+		err = rows.Scan(&result.Neighborhood, &result.NumOrders)
+		if err != nil {
+			log.Println("Reading Summary row failed: ", err)
+			return nil, err
+		}
+
+		results = append(results, result)
+	}
+
+	if rows.Err() != nil {
+		log.Println("Reading Summary rows had an issue: ", err)
+		return nil, err
+	}
+	return results, nil
+}
+
 ////////////////////////////////////////////////////////////////////////////
 //
 type CustomerType struct {
