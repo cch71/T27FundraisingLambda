@@ -1004,9 +1004,9 @@ func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
 //
 func FrConfigType2Sql(frConfig FrConfigType) ([]string, []string, []interface{}) {
 	values := []interface{}{}
+	sqlFields := []string{}
 	valIdxs := []string{}
 	valIdx := 1
-	sqlFields := []string{}
 	if len(frConfig.Kind) != 0 {
 		sqlFields = append(sqlFields, "kind")
 		values = append(values, frConfig.Kind)
@@ -1137,26 +1137,39 @@ type MulchTimecardType struct {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func GetMulchTimecards(ctx context.Context, id string) ([]MulchTimecardType, error) {
+func GetMulchTimecards(ctx context.Context, id string, deliveryId int) ([]MulchTimecardType, error) {
 	timecards := []MulchTimecardType{}
 
 	if err := verifyAdminTokenFromCtx(ctx); err != nil {
 		return timecards, err
 	}
 
-	doQuery := func(id string) (pgx.Rows, error) {
-		if len(id) == 0 {
-			log.Println("Retrieving All Timecards")
-			sqlCmd := `select uid, delivery_id, last_modified_time::string, time_in::string, time_out::string, time_total::string from mulch_delivery_timecards`
-			return Db.Query(context.Background(), sqlCmd)
-		} else {
-			log.Println("Retrieving Timecards for: ", id)
-			sqlCmd := `select uid, delivery_id, last_modified_time::string, time_in::string, time_out::string, time_total::string from mulch_delivery_timecards where uid=$1`
-			return Db.Query(context.Background(), sqlCmd, id)
-		}
+	values := []interface{}{}
+	sqlFields := []string{}
+	valIdx := 1
+	sqlCmd := `SELECT uid, delivery_id, last_modified_time::string, time_in::string, time_out::string, time_total::string FROM mulch_delivery_timecards`
+
+	if len(id) != 0 || deliveryId != -1 {
+		sqlCmd = sqlCmd + " WHERE"
 	}
 
-	rows, err := doQuery(id)
+	if len(id) != 0 {
+		log.Println("Timecards User Id: ", id)
+		values = append(values, id)
+		sqlFields = append(sqlFields, fmt.Sprintf("uid=$%d", valIdx))
+		valIdx++
+	}
+	if deliveryId != -1 {
+		log.Println("Timecards DeliveryId: ", deliveryId)
+		values = append(values, deliveryId)
+		sqlFields = append(sqlFields, fmt.Sprintf("delivery_id=$%d", valIdx))
+		valIdx++
+	}
+
+	sqlCmd = fmt.Sprintf("%s %s", sqlCmd, strings.Join(sqlFields, " AND "))
+	log.Println("Retrieving Timecards: ", sqlCmd)
+	rows, err := Db.Query(context.Background(), sqlCmd, values...)
+
 	if err != nil {
 		log.Println("Timecard query Failed", err)
 		return timecards, nil

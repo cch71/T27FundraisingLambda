@@ -344,14 +344,22 @@ func init() {
 				Description: "The id for which data should be returned.  If empty then all timecards will be returned",
 				Type:        graphql.String,
 			},
+			"deliveryId": &graphql.ArgumentConfig{
+				Description: "The delivery id to return.  If empty then timecards from both deliveires will be returned",
+				Type:        graphql.Int,
+			},
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 			// if is_mulch_order getMulchOrder Else get etc...
 			id := ""
+			deliveryId := -1
 			if val, ok := p.Args["id"]; ok {
 				id = val.(string)
 			}
-			return GetMulchTimecards(p.Context, id)
+			if val, ok := p.Args["deliveryId"]; ok {
+				deliveryId = val.(int)
+			}
+			return GetMulchTimecards(p.Context, id, deliveryId)
 		},
 	}
 
