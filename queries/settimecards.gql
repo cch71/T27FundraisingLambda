@@ -1,10 +1,10 @@
 
 mutation {
   setMulchTimecards(timecards: [{
-    id: "fruser1",
+    id: "abuchert",
     deliveryId: 1,
-    timeIn: "08:00:00",
-    timeOut: "18:00:00",
-    timeTotal: "10:00:00"
+    timeIn: "07:00:00",
+    timeOut: "12:00:00",
+    timeTotal: "05:00:00"
   }])
 }

@@ -1,0 +1,17 @@
+{
+  mulchTimecards{
+    id,
+    timeTotal
+  }
+  mulchOrders {
+    ownerId
+    purchases {
+        productId
+        numSold
+        amountCharged
+    }
+    amountFromDonations
+    amountTotalCollected
+    spreaders
+  }
+}

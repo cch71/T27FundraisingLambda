@@ -1,0 +1,19 @@
+{
+  mulchOrders {
+    orderId
+    ownerId
+    customer {
+        name
+        addr1
+        addr2
+        phone
+        neighborhood
+    }
+    specialInstructions
+    purchases {
+        productId
+        numSold
+    }
+    deliveryId
+  }
+}

@@ -213,12 +213,13 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 
 		err = rows.Scan(&purchases, &donationsAsStr, &totalCollectedAsStr)
 		if err != nil {
-			log.Println("Reading User Summary row failed: ", err)
+			// log.Println("Reading User Summary row failed: ", err)
 			return OwnerIdSummaryType{}, err
 		}
 		if totalCollectedAsStr == nil {
 			continue
 		}
+		//log.Println("TotalCollectedAsStr: ", *totalCollectedAsStr)
 		total, err := decimal.NewFromString(*totalCollectedAsStr)
 		if err != nil {
 			return OwnerIdSummaryType{}, err
@@ -226,6 +227,7 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 		totalCollected = totalCollected.Add(total)
 
 		if donationsAsStr != nil {
+			// log.Println("DonationsStr: ", *donationsAsStr)
 			donationAmt, err := decimal.NewFromString(*donationsAsStr)
 			if err != nil {
 				return OwnerIdSummaryType{}, err
@@ -234,6 +236,9 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 		}
 
 		for _, item := range purchases {
+			// log.Println("ItemAmountChargedStr: ", item.AmountCharged)a
+			//ISSUE #108
+			item.AmountCharged = strings.Replace(item.AmountCharged, ",", "", -1)
 			amt, err := decimal.NewFromString(item.AmountCharged)
 			if err != nil {
 				return OwnerIdSummaryType{}, err
@@ -1232,7 +1237,6 @@ func SetMulchTimecards(ctx context.Context, timecards []MulchTimecardType) (bool
 			}
 		}
 	}
-
 	log.Println("About to make a commitment")
 	err = trxn.Commit(context.Background())
 	if err != nil {
@@ -1380,6 +1384,20 @@ func AddUsers(ctx context.Context, users []UserInfo, jwt string) (bool, error) {
 		return false, err
 	}
 
+	existingUsers, err := GetUsers([]string{"id"})
+	if err != nil {
+		return false, err
+	}
+
+	doesAlreadyExist := func(uid string) bool {
+		for _, existingUser := range existingUsers {
+			if existingUser.Id == uid {
+				return true
+			}
+		}
+		return false
+	}
+
 	// Start Database Operations
 	trxn, err := Db.Begin(context.Background())
 	if err != nil {
@@ -1387,12 +1405,18 @@ func AddUsers(ctx context.Context, users []UserInfo, jwt string) (bool, error) {
 	}
 
 	for _, user := range users {
-		log.Println("Deleting existing record if it exists")
-		_, err = trxn.Exec(context.Background(), "delete from users where id = $1", user.Id)
-		if err != nil {
-			trxn.Rollback(context.Background())
-			return false, err
+		if doesAlreadyExist(user.Id) {
+			log.Println("User: ", user.Id, " already exists")
+			continue
+		} else {
+			log.Println("User: ", user.Id, " does not exists")
 		}
+		// log.Println("Deleting existing record if it exists")
+		// _, err = trxn.Exec(context.Background(), "delete from users where id = $1", user.Id)
+		// if err != nil {
+		// 	trxn.Rollback(context.Background())
+		// 	return false, err
+		// }
 
 		sqlCmd := "insert into users(id, name, group_id) values ($1, $2, $3)"
 		log.Println("Adding user SqlCmd: ", sqlCmd)
@@ -1401,6 +1425,7 @@ func AddUsers(ctx context.Context, users []UserInfo, jwt string) (bool, error) {
 			trxn.Rollback(context.Background())
 			return false, err
 		}
+		existingUsers = append(existingUsers, user)
 	}
 
 	sqlCmd2 := "UPDATE fundraiser_config SET last_modified_time=$1::timestamp WHERE last_modified_time=(SELECT last_modified_time FROM fundraiser_config LIMIT 1)"
