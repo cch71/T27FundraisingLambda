@@ -1,0 +1,22 @@
+mutation {
+  setFundraiserCloseoutAllocations(
+    allocations: [
+      {
+        uid: "myuid",
+        bagsSold: 234,
+        bagsSpread: 100,
+        deliveryMinutes: "24.0000",
+        totalDonations: "234.2300",
+        allocationsFromBagsSold: "4.3423",
+        allocationsFromBagsSpread: "5.3423",
+        allocationsFromDelivery: "14.4543",
+        allocationsTotal: "2344.3433"
+      },{
+        uid: "myuid2",
+        bagsSold: 534,
+        allocationsFromBagsSold: "34.3423",
+        allocationsTotal: "34.3423",
+      }
+    ]
+  )
+}
