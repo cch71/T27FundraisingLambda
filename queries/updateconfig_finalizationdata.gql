@@ -1,0 +1,18 @@
+mutation {
+  updateConfig(config: {
+    finalizationData: {
+      bankDeposited: "0.0000",
+      mulchCost: "0.0000",
+      perBagCost: "0.0000",
+      profitsFromBags: "0.0000",
+      mulchSalesGross: "0.0000",
+      moneyPoolForTroop: "0.0000",
+      moneyPoolForScoutsSubPools: "0.0000",
+      moneyPoolForScoutsSales: "0.0000",
+      moneyPoolForScoutsDelivery: "0.0000",
+      perBagAvgEarnings: "0.0000",  
+      deliveryEarningsPerMinute: "0.0000"
+    }
+  })
+}
+  

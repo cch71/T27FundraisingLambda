@@ -944,6 +944,22 @@ type ProductType struct {
 
 ////////////////////////////////////////////////////////////////////////////
 //
+type FinalizationDataType struct {
+	BankDeposited              string `json:"bankDeposited"`
+	MulchCost                  string `json:"mulchCost"`
+	PerBagCost                 string `json:"perBagCost"`
+	ProfitsFromBags            string `json:"profitsFromBags"`
+	MulchSalesGross            string `json:"mulchSalesGross"`
+	MoneyPoolForTroop          string `json:"moneyPoolForTroop"`
+	MoneyPoolForScoutsSubPools string `json:"moneyPoolForScoutsSubPools"`
+	MoneyPoolForScoutsSales    string `json:"moneyPoolForScoutsSales"`
+	MoneyPoolForScoutsDelivery string `json:"moneyPoolForScoutsDelivery"`
+	PerBagAvgEarnings          string `json:"perBagAvgEarnings"`
+	DeliveryEarningsPerMinute  string `json:"deliveryEarningsPerMinute"`
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
 type FrConfigType struct {
 	Kind                 string                    `json:"kind"`
 	Description          string                    `json:"description"`
@@ -952,6 +968,7 @@ type FrConfigType struct {
 	Neighborhoods        []NeighborhoodsType       `json:"neighborhoods"`
 	MulchDeliveryConfigs []MulchDeliveryConfigType `json:"mulchDeliveryConfigs"`
 	Products             []ProductType             `json:"products"`
+	FinalizationData     *FinalizationDataType     `json:"finalizationData"`
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -975,9 +992,6 @@ func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
 		case "lastModifiedTime" == gqlField:
 			params = append(params, &frConfig.LastModifiedTime)
 			sqlFields = append(sqlFields, "last_modified_time::string")
-		case "isLocked" == gqlField:
-			params = append(params, &frConfig.IsLocked)
-			sqlFields = append(sqlFields, "is_locked")
 		case "neighborhoods" == gqlField:
 			params = append(params, &frConfig.Neighborhoods)
 			sqlFields = append(sqlFields, "neighborhoods::jsonb")
@@ -987,6 +1001,12 @@ func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
 		case "products" == gqlField:
 			params = append(params, &frConfig.Products)
 			sqlFields = append(sqlFields, "products::jsonb")
+		case "finalizationData" == gqlField:
+			params = append(params, &frConfig.FinalizationData)
+			sqlFields = append(sqlFields, "finalization_data::jsonb")
+		case "isLocked" == gqlField:
+			params = append(params, &frConfig.IsLocked)
+			sqlFields = append(sqlFields, "is_locked")
 		case "users" == gqlField:
 			//Skipping because it is handled seperately
 		default:
@@ -1039,6 +1059,12 @@ func FrConfigType2Sql(frConfig FrConfigType) ([]string, []string, []interface{})
 	if len(frConfig.MulchDeliveryConfigs) != 0 {
 		sqlFields = append(sqlFields, "mulch_delivery_configs")
 		values = append(values, frConfig.MulchDeliveryConfigs)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::jsonb", valIdx))
+		valIdx++
+	}
+	if nil != frConfig.FinalizationData {
+		sqlFields = append(sqlFields, "finalization_data")
+		values = append(values, *frConfig.FinalizationData)
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::jsonb", valIdx))
 		valIdx++
 	}

@@ -23,6 +23,19 @@
         unitPrice
       }
     }
+    finalizationData {
+      bankDeposited
+      mulchCost
+      perBagCost
+      profitsFromBags
+      mulchSalesGross
+      moneyPoolForTroop
+      moneyPoolForScoutsSubPools
+      moneyPoolForScoutsSales
+      moneyPoolForScoutsDelivery
+      perBagAvgEarnings  
+      deliveryEarningsPerMinute
+    }
     users {
       id
       name

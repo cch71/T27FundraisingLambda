@@ -500,6 +500,22 @@ func init() {
 			"priceBreaks": &graphql.Field{Type: graphql.NewList(productPriceBreakConfigType)},
 		},
 	})
+	finalizationDataConfigType := graphql.NewObject(graphql.ObjectConfig{
+		Name: "finalizationDataConfigType",
+		Fields: graphql.Fields{
+			"bankDeposited":              &graphql.Field{Type: graphql.String},
+			"mulchCost":                  &graphql.Field{Type: graphql.String},
+			"perBagCost":                 &graphql.Field{Type: graphql.String},
+			"profitsFromBags":            &graphql.Field{Type: graphql.String},
+			"mulchSalesGross":            &graphql.Field{Type: graphql.String},
+			"moneyPoolForTroop":          &graphql.Field{Type: graphql.String},
+			"moneyPoolForScoutsSubPools": &graphql.Field{Type: graphql.String},
+			"moneyPoolForScoutsSales":    &graphql.Field{Type: graphql.String},
+			"moneyPoolForScoutsDelivery": &graphql.Field{Type: graphql.String},
+			"perBagAvgEarnings":          &graphql.Field{Type: graphql.String},
+			"deliveryEarningsPerMinute":  &graphql.Field{Type: graphql.String},
+		},
+	})
 	configType := graphql.NewObject(graphql.ObjectConfig{
 		Name:        "ConfigType",
 		Description: "Fundraiser config information",
@@ -511,6 +527,7 @@ func init() {
 			"mulchDeliveryConfigs": &graphql.Field{Type: graphql.NewList(mulchDeliveryConfigType)},
 			"products":             &graphql.Field{Type: graphql.NewList(productConfigType)},
 			"neighborhoods":        &graphql.Field{Type: graphql.NewList(neighborhoodConfigType)},
+			"finalizationData":     &graphql.Field{Type: finalizationDataConfigType},
 			"users":                queryFields["users"],
 		},
 	})
@@ -555,6 +572,22 @@ func init() {
 			"priceBreaks": &graphql.InputObjectFieldConfig{Type: graphql.NewList(productPriceBreakInputConfigType)},
 		},
 	})
+	finalizationDataInputConfigType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: "finalizationDataInputConfigType",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"bankDeposited":              &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"mulchCost":                  &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"perBagCost":                 &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"profitsFromBags":            &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"mulchSalesGross":            &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"moneyPoolForTroop":          &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"moneyPoolForScoutsSubPools": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"moneyPoolForScoutsSales":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"moneyPoolForScoutsDelivery": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"perBagAvgEarnings":          &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"deliveryEarningsPerMinute":  &graphql.InputObjectFieldConfig{Type: graphql.String},
+		},
+	})
 	configInputType := graphql.NewInputObject(graphql.InputObjectConfig{
 		Name:        "ConfigType",
 		Description: "Fundraiser config information",
@@ -566,6 +599,7 @@ func init() {
 			"mulchDeliveryConfigs": &graphql.InputObjectFieldConfig{Type: graphql.NewList(mulchDeliveryInputConfigType)},
 			"products":             &graphql.InputObjectFieldConfig{Type: graphql.NewList(productInputConfigType)},
 			"neighborhoods":        &graphql.InputObjectFieldConfig{Type: graphql.NewList(neighborhoodInputConfigType)},
+			"finalizationData":     &graphql.InputObjectFieldConfig{Type: finalizationDataInputConfigType},
 		},
 	})
 	mutationFields["setConfig"] = &graphql.Field{
@@ -606,7 +640,6 @@ func init() {
 				fmt.Println("Error encoding JSON")
 				return nil, nil
 			}
-
 			frConfig := FrConfigType{}
 			json.Unmarshal([]byte(jsonString), &frConfig)
 			return UpdateFundraiserConfig(p.Context, frConfig)
