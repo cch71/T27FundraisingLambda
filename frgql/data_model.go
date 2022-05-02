@@ -259,6 +259,39 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 		return OwnerIdSummaryType{}, err
 	}
 
+	allocationsFromDelivery := decimal.NewFromInt(0)
+	allocationsFromBagsSold := decimal.NewFromInt(0)
+	allocationsFromBagsSpread := decimal.NewFromInt(0)
+	allocationsTotal := decimal.NewFromInt(0)
+	var allocFromBagsSoldStr, allocFromBagsSpreadStr, allocFromDeliveryStr, allocTotalStr string
+
+	sqlCmd = "select allocation_from_bags_sold::string, allocation_from_bags_spread::string, " +
+		"allocation_from_delivery::string, allocation_total::string from allocation_summary where allocation_summary.uid=$1"
+	log.Println("SqlCmd: ", sqlCmd)
+	err = Db.QueryRow(context.Background(), sqlCmd, ownerId).Scan(&allocFromBagsSoldStr, &allocFromBagsSpreadStr, &allocFromDeliveryStr, &allocTotalStr)
+	if err == nil {
+		// log.Println("Allocation summary query for: ", ownerId, " failed", err)
+		allocationsFromBagsSold, err = decimal.NewFromString(allocFromBagsSoldStr)
+		if err != nil {
+			return OwnerIdSummaryType{}, err
+		}
+
+		allocationsFromBagsSpread, err = decimal.NewFromString(allocFromBagsSpreadStr)
+		if err != nil {
+			return OwnerIdSummaryType{}, err
+		}
+
+		allocationsFromDelivery, err = decimal.NewFromString(allocFromDeliveryStr)
+		if err != nil {
+			return OwnerIdSummaryType{}, err
+		}
+
+		allocationsTotal, err = decimal.NewFromString(allocTotalStr)
+		if err != nil {
+			return OwnerIdSummaryType{}, err
+		}
+	}
+
 	return OwnerIdSummaryType{
 		TotalNumBagsSold:                    numBagsSold,
 		TotalNumBagsSoldToSpread:            numBagsToSpreadSold,
@@ -266,6 +299,10 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 		TotalAmountCollectedForBags:         totalCollectedForBags.String(),
 		TotalAmountCollectedForBagsToSpread: totalCollectedForSpreading.String(),
 		TotalAmountCollected:                totalCollected.String(),
+		AllocationsFromDelivery:             allocationsFromDelivery.String(),
+		AllocationsFromBagsSold:             allocationsFromBagsSold.String(),
+		AllocationsFromBagsSpread:           allocationsFromBagsSpread.String(),
+		AllocationsTotal:                    allocationsTotal.String(),
 	}, nil
 }
 
