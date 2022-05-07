@@ -710,6 +710,45 @@ func init() {
 		},
 	}
 	//////////////////////////////////////////////////////////////////////////////
+	// Set Fundraiser closeout allocations
+	allocationsInputType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name:        "AllocationsInputType",
+		Description: "Allocations",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"uid":                       &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"bagsSold":                  &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"bagsSpread":                &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"deliveryMinutes":           &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"totalDonations":            &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"allocationsFromBagsSold":   &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"allocationsFromBagsSpread": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"allocationsFromDelivery":   &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"allocationsTotal":          &graphql.InputObjectFieldConfig{Type: graphql.String},
+		},
+	})
+	mutationFields["setFundraiserCloseoutAllocations"] = &graphql.Field{
+		Type:        graphql.Boolean,
+		Description: "SetFundraiserCloseoutAllocations",
+		Args: graphql.FieldConfigArgument{
+			"allocations": &graphql.ArgumentConfig{
+				Description: "Allocations",
+				Type:        graphql.NewList(allocationsInputType),
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// log.Println("Setting Config: ", p.Args["config"])
+			jsonString, err := json.Marshal(p.Args["allocations"])
+			if err != nil {
+				fmt.Println("Error encoding JSON")
+				return nil, nil
+			}
+
+			allocations := []AllocationItemType{}
+			json.Unmarshal([]byte(jsonString), &allocations)
+			return SetFrCloseoutAllocations(p.Context, allocations)
+		},
+	}
+	//////////////////////////////////////////////////////////////////////////////
 	// Summary Query Types
 	ownerIdSummaryType := graphql.NewObject(graphql.ObjectConfig{
 		Name:        "OwnerIdSummaryType",

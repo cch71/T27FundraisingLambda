@@ -271,19 +271,24 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 	err = Db.QueryRow(context.Background(), sqlCmd, ownerId).Scan(&allocFromBagsSoldStr, &allocFromBagsSpreadStr, &allocFromDeliveryStr, &allocTotalStr)
 	if err == nil {
 		// log.Println("Allocation summary query for: ", ownerId, " failed", err)
-		allocationsFromBagsSold, err = decimal.NewFromString(allocFromBagsSoldStr)
-		if err != nil {
-			return OwnerIdSummaryType{}, err
+		if len(allocFromBagsSoldStr) > 0 {
+			allocationsFromBagsSold, err = decimal.NewFromString(allocFromBagsSoldStr)
+			if err != nil {
+				return OwnerIdSummaryType{}, err
+			}
 		}
 
-		allocationsFromBagsSpread, err = decimal.NewFromString(allocFromBagsSpreadStr)
-		if err != nil {
-			return OwnerIdSummaryType{}, err
+		if len(allocFromBagsSpreadStr) > 0 {
+			allocationsFromBagsSpread, err = decimal.NewFromString(allocFromBagsSpreadStr)
+			if err != nil {
+				return OwnerIdSummaryType{}, err
+			}
 		}
-
-		allocationsFromDelivery, err = decimal.NewFromString(allocFromDeliveryStr)
-		if err != nil {
-			return OwnerIdSummaryType{}, err
+		if len(allocFromDeliveryStr) > 0 {
+			allocationsFromDelivery, err = decimal.NewFromString(allocFromDeliveryStr)
+			if err != nil {
+				return OwnerIdSummaryType{}, err
+			}
 		}
 
 		allocationsTotal, err = decimal.NewFromString(allocTotalStr)
@@ -1623,6 +1628,137 @@ func SetSpreaders(orderId string, spreaders []string) (bool, error) {
 		}
 	}
 
+	log.Println("About to make a commitment")
+	err = trxn.Commit(context.Background())
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+type AllocationItemType struct {
+	Uid                       string
+	BagsSold                  *int
+	BagsSpread                *int
+	DeliveryMinutes           *string
+	TotalDonations            *string
+	AllocationsFromBagsSold   *string
+	AllocationsFromBagsSpread *string
+	AllocationsFromDelivery   *string
+	AllocationsTotal          string
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func AllocItemType2Sql(item AllocationItemType) ([]string, []string, []interface{}) {
+	values := []interface{}{}
+	sqlFields := []string{}
+	valIdxs := []string{}
+	valIdx := 1
+
+	sqlFields = append(sqlFields, "uid")
+	values = append(values, item.Uid)
+	valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+	valIdx++
+
+	sqlFields = append(sqlFields, "allocation_total")
+	values = append(values, item.AllocationsTotal)
+	valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
+	valIdx++
+
+	if nil != item.BagsSold {
+		sqlFields = append(sqlFields, "bags_sold")
+		values = append(values, *item.BagsSold)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::int", valIdx))
+		valIdx++
+	}
+
+	if nil != item.BagsSpread {
+		sqlFields = append(sqlFields, "bags_spread")
+		values = append(values, *item.BagsSpread)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::int", valIdx))
+		valIdx++
+	}
+
+	if nil != item.DeliveryMinutes {
+		sqlFields = append(sqlFields, "delivery_minutes")
+		values = append(values, *item.DeliveryMinutes)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
+		valIdx++
+	}
+
+	if nil != item.TotalDonations {
+		sqlFields = append(sqlFields, "total_donations")
+		values = append(values, *item.TotalDonations)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
+		valIdx++
+	}
+
+	if nil != item.AllocationsFromBagsSold {
+		sqlFields = append(sqlFields, "allocation_from_bags_sold")
+		values = append(values, *item.AllocationsFromBagsSold)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
+		valIdx++
+	}
+
+	if nil != item.AllocationsFromBagsSpread {
+		sqlFields = append(sqlFields, "allocation_from_bags_spread")
+		values = append(values, *item.AllocationsFromBagsSpread)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
+		valIdx++
+	}
+
+	if nil != item.AllocationsFromDelivery {
+		sqlFields = append(sqlFields, "allocation_from_delivery")
+		values = append(values, *item.AllocationsFromDelivery)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
+		valIdx++
+	}
+
+	return sqlFields, valIdxs, values
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func SetFrCloseoutAllocations(ctx context.Context, allocations []AllocationItemType) (bool, error) {
+	log.Println("Setting Fr Closeout Allocations: ", allocations)
+
+	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
+	trxn, err := Db.Begin(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	log.Println("Deleting existing records")
+	_, err = trxn.Exec(context.Background(), "delete from allocation_summary")
+	if err != nil {
+		trxn.Rollback(context.Background())
+		return false, err
+	}
+
+	for _, item := range allocations {
+		if len(item.Uid) == 0 {
+			trxn.Rollback(context.Background())
+			errMsg := fmt.Sprint("UID not in record: ", item)
+			log.Println(errMsg)
+			return false, errors.New(errMsg)
+		}
+		sqlFields, valIdxs, values := AllocItemType2Sql(item)
+		sqlCmd := fmt.Sprintf("insert into allocation_summary(%s) values (%s)",
+			strings.Join(sqlFields, ","), strings.Join(valIdxs, ","))
+		log.Println("Adding Allocation for ", item.Uid, " SqlCmd: ", sqlCmd)
+		_, err = trxn.Exec(context.Background(), sqlCmd, values...)
+		if err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
+
+	}
 	log.Println("About to make a commitment")
 	err = trxn.Commit(context.Background())
 	if err != nil {
