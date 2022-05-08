@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -259,45 +260,63 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 		return OwnerIdSummaryType{}, err
 	}
 
+	timecards, err := GetMulchTimecards(ownerId, -1, []string{"timeTotal"})
+	if err != nil {
+		log.Println("User summary timecard query failed", err)
+		return OwnerIdSummaryType{}, err
+	}
+	deliveryMinutes, _ := time.ParseDuration("0s")
+	for _, tc := range timecards {
+		log.Println("Timecard: ", tc.TimeTotal)
+		durarr := strings.Split(tc.TimeTotal, ":")
+		hours, _ := time.ParseDuration(durarr[0] + "h")
+		mins, _ := time.ParseDuration(durarr[1] + "m")
+		secs, _ := time.ParseDuration(durarr[2] + "s")
+		deliveryMinutes = deliveryMinutes + hours + mins + secs
+	}
+
 	allocationsFromDelivery := decimal.NewFromInt(0)
 	allocationsFromBagsSold := decimal.NewFromInt(0)
 	allocationsFromBagsSpread := decimal.NewFromInt(0)
 	allocationsTotal := decimal.NewFromInt(0)
-	var allocFromBagsSoldStr, allocFromBagsSpreadStr, allocFromDeliveryStr, allocTotalStr string
+	var allocFromBagsSoldStr, allocFromBagsSpreadStr, allocFromDeliveryStr, allocTotalStr *string
 
 	sqlCmd = "select allocation_from_bags_sold::string, allocation_from_bags_spread::string, " +
 		"allocation_from_delivery::string, allocation_total::string from allocation_summary where allocation_summary.uid=$1"
 	log.Println("SqlCmd: ", sqlCmd)
 	err = Db.QueryRow(context.Background(), sqlCmd, ownerId).Scan(&allocFromBagsSoldStr, &allocFromBagsSpreadStr, &allocFromDeliveryStr, &allocTotalStr)
 	if err == nil {
-		// log.Println("Allocation summary query for: ", ownerId, " failed", err)
-		if len(allocFromBagsSoldStr) > 0 {
-			allocationsFromBagsSold, err = decimal.NewFromString(allocFromBagsSoldStr)
+		log.Println("Allocation summary query for: ", ownerId, "alloc: ", allocFromBagsSoldStr)
+		if nil != allocFromBagsSoldStr {
+			allocationsFromBagsSold, err = decimal.NewFromString(*allocFromBagsSoldStr)
 			if err != nil {
 				return OwnerIdSummaryType{}, err
 			}
 		}
 
-		if len(allocFromBagsSpreadStr) > 0 {
-			allocationsFromBagsSpread, err = decimal.NewFromString(allocFromBagsSpreadStr)
+		if nil != allocFromBagsSpreadStr {
+			allocationsFromBagsSpread, err = decimal.NewFromString(*allocFromBagsSpreadStr)
 			if err != nil {
 				return OwnerIdSummaryType{}, err
 			}
 		}
-		if len(allocFromDeliveryStr) > 0 {
-			allocationsFromDelivery, err = decimal.NewFromString(allocFromDeliveryStr)
+		if nil != allocFromDeliveryStr {
+			allocationsFromDelivery, err = decimal.NewFromString(*allocFromDeliveryStr)
 			if err != nil {
 				return OwnerIdSummaryType{}, err
 			}
 		}
 
-		allocationsTotal, err = decimal.NewFromString(allocTotalStr)
+		allocationsTotal, err = decimal.NewFromString(*allocTotalStr)
 		if err != nil {
 			return OwnerIdSummaryType{}, err
 		}
+	} else {
+		log.Println("Allocation summary query for: ", ownerId, "failed: ", err)
 	}
 
 	return OwnerIdSummaryType{
+		TotalDeliveryMinutes:                int(math.Floor(deliveryMinutes.Minutes())),
 		TotalNumBagsSold:                    numBagsSold,
 		TotalNumBagsSoldToSpread:            numBagsToSpreadSold,
 		TotalAmountCollectedForDonations:    totalCollectedForDonations.String(),
@@ -1210,18 +1229,53 @@ type MulchTimecardType struct {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func GetMulchTimecards(ctx context.Context, id string, deliveryId int) ([]MulchTimecardType, error) {
+func mulchTimecardGql2SqlMap(gqlFields []string, tc *MulchTimecardType) ([]string, []interface{}) {
+
+	sqlFields := []string{}
+	inputs := []interface{}{}
+
+	for _, gqlField := range gqlFields {
+		switch {
+		case "id" == gqlField:
+			inputs = append(inputs, &tc.Id)
+			sqlFields = append(sqlFields, "uid")
+		case "deliveryId" == gqlField:
+			inputs = append(inputs, &tc.DeliveryId)
+			sqlFields = append(sqlFields, "delivery_id")
+		case "lastModifiedTime" == gqlField:
+			inputs = append(inputs, &tc.LastModifiedTime)
+			sqlFields = append(sqlFields, "last_modified_time::string")
+		case "timeIn" == gqlField:
+			inputs = append(inputs, &tc.TimeIn)
+			sqlFields = append(sqlFields, "time_in::string")
+		case "timeOut" == gqlField:
+			inputs = append(inputs, &tc.TimeOut)
+			sqlFields = append(sqlFields, "time_out::string")
+		case "timeTotal" == gqlField:
+			inputs = append(inputs, &tc.TimeTotal)
+			sqlFields = append(sqlFields, "time_total::string")
+		default:
+			log.Println("Do not know how to handle GraphQL Field: ", gqlField)
+		}
+
+	}
+	return sqlFields, inputs
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func GetMulchTimecards(id string, deliveryId int, gqlFields []string) ([]MulchTimecardType, error) {
 	timecards := []MulchTimecardType{}
 
-	if err := verifyAdminTokenFromCtx(ctx); err != nil {
-		return timecards, err
-	}
+	tc := MulchTimecardType{} //This is pretty much throw away probably should change to nil
+	sqlFields, _ := mulchTimecardGql2SqlMap(gqlFields, &tc)
+
+	sqlCmd := fmt.Sprintf("SELECT %s FROM mulch_delivery_timecards", strings.Join(sqlFields, ","))
+	log.Println("Retrieving Timecards: ", sqlCmd)
 
 	values := []interface{}{}
-	sqlFields := []string{}
 	valIdx := 1
-	sqlCmd := `SELECT uid, delivery_id, last_modified_time::string, time_in::string, time_out::string, time_total::string FROM mulch_delivery_timecards`
-
+	sqlFields = []string{} // Reset for WHERE entries
 	if len(id) != 0 || deliveryId != -1 {
 		sqlCmd = sqlCmd + " WHERE"
 	}
@@ -1240,7 +1294,6 @@ func GetMulchTimecards(ctx context.Context, id string, deliveryId int) ([]MulchT
 	}
 
 	sqlCmd = fmt.Sprintf("%s %s", sqlCmd, strings.Join(sqlFields, " AND "))
-	log.Println("Retrieving Timecards: ", sqlCmd)
 	rows, err := Db.Query(context.Background(), sqlCmd, values...)
 
 	if err != nil {
@@ -1252,7 +1305,7 @@ func GetMulchTimecards(ctx context.Context, id string, deliveryId int) ([]MulchT
 
 	for rows.Next() {
 		tc := MulchTimecardType{}
-		inputs := []interface{}{&tc.Id, &tc.DeliveryId, &tc.LastModifiedTime, &tc.TimeIn, &tc.TimeOut, &tc.TimeTotal}
+		_, inputs := mulchTimecardGql2SqlMap(gqlFields, &tc)
 		err = rows.Scan(inputs...)
 		if err != nil {
 			log.Println("Reading timecard row failed: ", err)

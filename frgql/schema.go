@@ -359,7 +359,8 @@ func init() {
 			if val, ok := p.Args["deliveryId"]; ok {
 				deliveryId = val.(int)
 			}
-			return GetMulchTimecards(p.Context, id, deliveryId)
+			gqlFields := getSelectedFields([]string{"mulchTimecards"}, p)
+			return GetMulchTimecards(id, deliveryId, gqlFields)
 		},
 	}
 
