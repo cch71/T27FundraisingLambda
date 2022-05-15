@@ -1694,7 +1694,7 @@ func SetSpreaders(orderId string, spreaders []string) (bool, error) {
 type AllocationItemType struct {
 	Uid                       string
 	BagsSold                  *int
-	BagsSpread                *int
+	BagsSpread                *string
 	DeliveryMinutes           *string
 	TotalDonations            *string
 	AllocationsFromBagsSold   *string
@@ -1731,7 +1731,7 @@ func AllocItemType2Sql(item AllocationItemType) ([]string, []string, []interface
 	if nil != item.BagsSpread {
 		sqlFields = append(sqlFields, "bags_spread")
 		values = append(values, *item.BagsSpread)
-		valIdxs = append(valIdxs, fmt.Sprintf("$%d::int", valIdx))
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
 		valIdx++
 	}
 

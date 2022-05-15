@@ -718,7 +718,7 @@ func init() {
 		Fields: graphql.InputObjectConfigFieldMap{
 			"uid":                       &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"bagsSold":                  &graphql.InputObjectFieldConfig{Type: graphql.Int},
-			"bagsSpread":                &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"bagsSpread":                &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"deliveryMinutes":           &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"totalDonations":            &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"allocationsFromBagsSold":   &graphql.InputObjectFieldConfig{Type: graphql.String},

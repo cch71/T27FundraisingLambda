@@ -1,5 +1,5 @@
 {
-  summaryByOwnerId(ownerId: "lletourneau") {
+  summaryByOwnerId(ownerId: "cskinner") {
     totalDeliveryMinutes
     totalNumBagsSold
     totalNumBagsSoldToSpread
