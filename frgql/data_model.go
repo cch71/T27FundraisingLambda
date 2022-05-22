@@ -319,14 +319,14 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 		TotalDeliveryMinutes:                int(math.Floor(deliveryMinutes.Minutes())),
 		TotalNumBagsSold:                    numBagsSold,
 		TotalNumBagsSoldToSpread:            numBagsToSpreadSold,
-		TotalAmountCollectedForDonations:    totalCollectedForDonations.String(),
-		TotalAmountCollectedForBags:         totalCollectedForBags.String(),
-		TotalAmountCollectedForBagsToSpread: totalCollectedForSpreading.String(),
-		TotalAmountCollected:                totalCollected.String(),
-		AllocationsFromDelivery:             allocationsFromDelivery.String(),
-		AllocationsFromBagsSold:             allocationsFromBagsSold.String(),
-		AllocationsFromBagsSpread:           allocationsFromBagsSpread.String(),
-		AllocationsTotal:                    allocationsTotal.String(),
+		TotalAmountCollectedForDonations:    totalCollectedForDonations.StringFixedBank(4),
+		TotalAmountCollectedForBags:         totalCollectedForBags.StringFixedBank(4),
+		TotalAmountCollectedForBagsToSpread: totalCollectedForSpreading.StringFixedBank(4),
+		TotalAmountCollected:                totalCollected.StringFixedBank(4),
+		AllocationsFromDelivery:             allocationsFromDelivery.StringFixedBank(4),
+		AllocationsFromBagsSold:             allocationsFromBagsSold.StringFixedBank(4),
+		AllocationsFromBagsSpread:           allocationsFromBagsSpread.StringFixedBank(4),
+		AllocationsTotal:                    allocationsTotal.StringFixedBank(4),
 	}, nil
 }
 
