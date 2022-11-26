@@ -422,50 +422,50 @@ func init() {
 		},
 	}
 
-	userInputType := graphql.NewInputObject(graphql.InputObjectConfig{
-		Name:        "UserInfoInputType",
-		Description: "Fundraiser user",
-		Fields: graphql.InputObjectConfigFieldMap{
-			"name":     &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"id":       &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"group":    &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"password": &graphql.InputObjectFieldConfig{Type: graphql.String},
-		},
-	})
+	// userInputType := graphql.NewInputObject(graphql.InputObjectConfig{
+	// 	Name:        "UserInfoInputType",
+	// 	Description: "Fundraiser user",
+	// 	Fields: graphql.InputObjectConfigFieldMap{
+	// 		"name":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+	// 		"id":       &graphql.InputObjectFieldConfig{Type: graphql.String},
+	// 		"group":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+	// 		"password": &graphql.InputObjectFieldConfig{Type: graphql.String},
+	// 	},
+	// })
 
-	mutationFields["addUsers"] = &graphql.Field{
-		Type:        graphql.Boolean,
-		Description: "Add user(s) to system",
-		Args: graphql.FieldConfigArgument{
-			"users": &graphql.ArgumentConfig{
-				Description: "List of users",
-				Type:        graphql.NewList(userInputType),
-			},
-			"token": &graphql.ArgumentConfig{
-				Description: "Token",
-				Type:        graphql.String,
-			},
-		},
-		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			// log.Println("Setting Config: ", p.Args["config"])
-			token := ""
-			if val, ok := p.Args["token"]; ok {
-				token = val.(string)
-			}
+	// mutationFields["addUsers"] = &graphql.Field{
+	// 	Type:        graphql.Boolean,
+	// 	Description: "Add user(s) to system",
+	// 	Args: graphql.FieldConfigArgument{
+	// 		"users": &graphql.ArgumentConfig{
+	// 			Description: "List of users",
+	// 			Type:        graphql.NewList(userInputType),
+	// 		},
+	// 		"token": &graphql.ArgumentConfig{
+	// 			Description: "Token",
+	// 			Type:        graphql.String,
+	// 		},
+	// 	},
+	// 	Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+	// 		// log.Println("Setting Config: ", p.Args["config"])
+	// 		token := ""
+	// 		if val, ok := p.Args["token"]; ok {
+	// 			token = val.(string)
+	// 		}
 
-			jsonString, err := json.Marshal(p.Args["users"])
-			if err != nil {
-				log.Println("Error encoding JSON")
-				return nil, nil
-			}
-			users := []UserInfo{}
-			if err := json.Unmarshal([]byte(jsonString), &users); err != nil {
-				log.Println("Error decoding JSON to userinfo")
-				return nil, nil
-			}
-			return AddUsers(p.Context, users, token)
-		},
-	}
+	// 		jsonString, err := json.Marshal(p.Args["users"])
+	// 		if err != nil {
+	// 			log.Println("Error encoding JSON")
+	// 			return nil, nil
+	// 		}
+	// 		users := []UserInfo{}
+	// 		if err := json.Unmarshal([]byte(jsonString), &users); err != nil {
+	// 			log.Println("Error decoding JSON to userinfo")
+	// 			return nil, nil
+	// 		}
+	// 		return AddUsers(p.Context, users, token)
+	// 	},
+	// }
 
 	//////////////////////////////////////////////////////////////////////////////
 	// Config Query Types

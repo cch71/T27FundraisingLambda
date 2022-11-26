@@ -86,21 +86,18 @@ func makeDbConnection() (*pgxpool.Pool, error) {
 }
 
 ////////////////////////////////////////////////////////////////////////////
-// Define some custom types were going to use within our tokens
-type T27FrAppMetaClaims struct {
-	FullName string `json:"full_name"`
-}
-
+//
 type T27FrClaims struct {
-	Email   string             `json:"https://www.bsatroop27.us/email"`
-	Roles   []string           `json:"https://www.bsatroop27.us/roles"`
-	AppMeta T27FrAppMetaClaims `json:"https://www.bsatroop27.us/app_metadata"`
+	Email    string   `json:"email"`
+	Roles    []string `json:"groups"`
+	FullName string   `json:"name"`
+	Id       string   `json:"preferred_username"`
 	jwt.StandardClaims
 }
 
 func (claims *T27FrClaims) isAdmin() bool {
 	for _, role := range claims.Roles {
-		if "FrAdmins" == role {
+		if strings.HasSuffix(role, "FrAdmins") {
 			return true
 		}
 	}
@@ -108,7 +105,7 @@ func (claims *T27FrClaims) isAdmin() bool {
 }
 
 func (claims *T27FrClaims) userId() string {
-	return strings.Split(claims.Email, "@")[0]
+	return claims.Id
 }
 
 func (claims *T27FrClaims) doesUidMatch(uid string) bool {
@@ -1438,148 +1435,148 @@ func GetUsers(gqlFields []string) ([]UserInfo, error) {
 	return users, nil
 }
 
-type CreateUserAppMeta struct {
-	FullName string `json:"full_name"`
-}
-
-type CreateUser struct {
-	Email         string            `json:"email"`
-	EmailVerified bool              `json:"email_verified"`
-	AppMeta       CreateUserAppMeta `json:"app_metadata"`
-	Nickname      string            `json:"nickname"`
-	Connection    string            `json:"connection"`
-	VerifyEmail   bool              `json:"verify_email"`
-	Password      string            `json:"password"`
-}
-
-////////////////////////////////////////////////////////////////////////////
+// type CreateUserAppMeta struct {
+// 	FullName string `json:"full_name"`
+// }
 //
-func createUser(user *UserInfo, jwt *string) error {
+// type CreateUser struct {
+// 	Email         string            `json:"email"`
+// 	EmailVerified bool              `json:"email_verified"`
+// 	AppMeta       CreateUserAppMeta `json:"app_metadata"`
+// 	Nickname      string            `json:"nickname"`
+// 	Connection    string            `json:"connection"`
+// 	VerifyEmail   bool              `json:"verify_email"`
+// 	Password      string            `json:"password"`
+// }
 
-	param := CreateUser{
-		Email:         user.Id + "@bsatroop27.us",
-		EmailVerified: true,
-		AppMeta: CreateUserAppMeta{
-			FullName: user.Name,
-		},
-		Nickname:    user.Id,
-		Connection:  "Username-Password-Authentication",
-		VerifyEmail: false,
-		Password:    user.Password,
-	}
-
-	paramInBytes, err := json.Marshal(param)
-	if err != nil {
-		return errors.New(fmt.Sprint("Failed to marshal user. Err:", err))
-	}
-
-	url := fmt.Sprint(os.Getenv("AUTH0_BASE_URL"), "api/v2/users")
-	payload := strings.NewReader(string(paramInBytes))
-
-	req, err := http.NewRequest("POST", url, payload)
-	if err != nil {
-		return errors.New(fmt.Sprint("Failed creating request. Err: ", err))
-	}
-	req.Header.Add("content-type", "application/json")
-	req.Header.Add("authorization", "Bearer "+*jwt)
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Println(res)
-		return errors.New(fmt.Sprint("Failed making request. Err: ", err))
-	}
-
-	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
-	log.Println(string(body))
-	return nil
-}
-
-////////////////////////////////////////////////////////////////////////////
+// ////////////////////////////////////////////////////////////////////////////
+// //
+// func createUser(user *UserInfo, jwt *string) error {
 //
-func AddUsers(ctx context.Context, users []UserInfo, jwt string) (bool, error) {
-	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
-	log.Println("Setting Users at: ", lastModifiedTime)
-
-	if err := verifyAdminTokenFromCtx(ctx); err != nil {
-		return false, err
-	}
-
-	existingUsers, err := GetUsers([]string{"id"})
-	if err != nil {
-		return false, err
-	}
-
-	doesAlreadyExist := func(uid string) bool {
-		for _, existingUser := range existingUsers {
-			if existingUser.Id == uid {
-				return true
-			}
-		}
-		return false
-	}
-
-	// Start Database Operations
-	trxn, err := Db.Begin(context.Background())
-	if err != nil {
-		return false, err
-	}
-
-	for _, user := range users {
-		if doesAlreadyExist(user.Id) {
-			log.Println("User: ", user.Id, " already exists")
-			continue
-		} else {
-			log.Println("User: ", user.Id, " does not exists")
-		}
-		// log.Println("Deleting existing record if it exists")
-		// _, err = trxn.Exec(context.Background(), "delete from users where id = $1", user.Id)
-		// if err != nil {
-		// 	trxn.Rollback(context.Background())
-		// 	return false, err
-		// }
-
-		sqlCmd := "insert into users(id, name, group_id) values ($1, $2, $3)"
-		log.Println("Adding user SqlCmd: ", sqlCmd)
-		_, err = trxn.Exec(context.Background(), sqlCmd, user.Id, user.Name, user.Group)
-		if err != nil {
-			trxn.Rollback(context.Background())
-			return false, err
-		}
-		existingUsers = append(existingUsers, user)
-	}
-
-	sqlCmd2 := "UPDATE fundraiser_config SET last_modified_time=$1::timestamp WHERE last_modified_time=(SELECT last_modified_time FROM fundraiser_config LIMIT 1)"
-	_, err = trxn.Exec(context.Background(), sqlCmd2, lastModifiedTime)
-	if err != nil {
-		trxn.Rollback(context.Background())
-		return false, err
-	}
-
-	log.Println("About to make a commitment")
-	err = trxn.Commit(context.Background())
-	if err != nil {
-		return false, err
-	}
-
-	if len(jwt) <= 0 {
-		jwt = os.Getenv("AUTH0_ADMIN_TOKEN")
-	}
-
-	// Now go back through looking for password and if present create the account
-	if len(jwt) > 0 {
-		for _, user := range users {
-			if len(user.Password) <= 0 {
-				continue
-			}
-			if err := createUser(&user, &jwt); err != nil {
-				log.Println("Failed creating user: ", err)
-			}
-		}
-	}
-
-	return true, nil
-}
+// 	param := CreateUser{
+// 		Email:         user.Id + "@bsatroop27.us",
+// 		EmailVerified: true,
+// 		AppMeta: CreateUserAppMeta{
+// 			FullName: user.Name,
+// 		},
+// 		Nickname:    user.Id,
+// 		Connection:  "Username-Password-Authentication",
+// 		VerifyEmail: false,
+// 		Password:    user.Password,
+// 	}
+//
+// 	paramInBytes, err := json.Marshal(param)
+// 	if err != nil {
+// 		return errors.New(fmt.Sprint("Failed to marshal user. Err:", err))
+// 	}
+//
+// 	url := fmt.Sprint(os.Getenv("AUTH0_BASE_URL"), "api/v2/users")
+// 	payload := strings.NewReader(string(paramInBytes))
+//
+// 	req, err := http.NewRequest("POST", url, payload)
+// 	if err != nil {
+// 		return errors.New(fmt.Sprint("Failed creating request. Err: ", err))
+// 	}
+// 	req.Header.Add("content-type", "application/json")
+// 	req.Header.Add("authorization", "Bearer "+*jwt)
+//
+// 	res, err := http.DefaultClient.Do(req)
+// 	if err != nil {
+// 		log.Println(res)
+// 		return errors.New(fmt.Sprint("Failed making request. Err: ", err))
+// 	}
+//
+// 	defer res.Body.Close()
+// 	body, _ := io.ReadAll(res.Body)
+// 	log.Println(string(body))
+// 	return nil
+// }
+//
+// ////////////////////////////////////////////////////////////////////////////
+// //
+// func AddUsers(ctx context.Context, users []UserInfo, jwt string) (bool, error) {
+// 	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
+// 	log.Println("Setting Users at: ", lastModifiedTime)
+//
+// 	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+// 		return false, err
+// 	}
+//
+// 	existingUsers, err := GetUsers([]string{"id"})
+// 	if err != nil {
+// 		return false, err
+// 	}
+//
+// 	doesAlreadyExist := func(uid string) bool {
+// 		for _, existingUser := range existingUsers {
+// 			if existingUser.Id == uid {
+// 				return true
+// 			}
+// 		}
+// 		return false
+// 	}
+//
+// 	// Start Database Operations
+// 	trxn, err := Db.Begin(context.Background())
+// 	if err != nil {
+// 		return false, err
+// 	}
+//
+// 	for _, user := range users {
+// 		if doesAlreadyExist(user.Id) {
+// 			log.Println("User: ", user.Id, " already exists")
+// 			continue
+// 		} else {
+// 			log.Println("User: ", user.Id, " does not exists")
+// 		}
+// 		// log.Println("Deleting existing record if it exists")
+// 		// _, err = trxn.Exec(context.Background(), "delete from users where id = $1", user.Id)
+// 		// if err != nil {
+// 		// 	trxn.Rollback(context.Background())
+// 		// 	return false, err
+// 		// }
+//
+// 		sqlCmd := "insert into users(id, name, group_id) values ($1, $2, $3)"
+// 		log.Println("Adding user SqlCmd: ", sqlCmd)
+// 		_, err = trxn.Exec(context.Background(), sqlCmd, user.Id, user.Name, user.Group)
+// 		if err != nil {
+// 			trxn.Rollback(context.Background())
+// 			return false, err
+// 		}
+// 		existingUsers = append(existingUsers, user)
+// 	}
+//
+// 	sqlCmd2 := "UPDATE fundraiser_config SET last_modified_time=$1::timestamp WHERE last_modified_time=(SELECT last_modified_time FROM fundraiser_config LIMIT 1)"
+// 	_, err = trxn.Exec(context.Background(), sqlCmd2, lastModifiedTime)
+// 	if err != nil {
+// 		trxn.Rollback(context.Background())
+// 		return false, err
+// 	}
+//
+// 	log.Println("About to make a commitment")
+// 	err = trxn.Commit(context.Background())
+// 	if err != nil {
+// 		return false, err
+// 	}
+//
+// 	if len(jwt) <= 0 {
+// 		jwt = os.Getenv("AUTH0_ADMIN_TOKEN")
+// 	}
+//
+// 	// Now go back through looking for password and if present create the account
+// 	if len(jwt) > 0 {
+// 		for _, user := range users {
+// 			if len(user.Password) <= 0 {
+// 				continue
+// 			}
+// 			if err := createUser(&user, &jwt); err != nil {
+// 				log.Println("Failed creating user: ", err)
+// 			}
+// 		}
+// 	}
+//
+// 	return true, nil
+// }
 
 ////////////////////////////////////////////////////////////////////////////
 //
