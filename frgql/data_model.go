@@ -978,13 +978,6 @@ type MulchDeliveryConfigType struct {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-type NeighborhoodsType struct {
-	Name              string `json: name`
-	DistributionPoint string `json:"distributionPoint"`
-}
-
-////////////////////////////////////////////////////////////////////////////
-//
 type ProductPriceBreaks struct {
 	Gt        int    `json:"gt"`
 	UnitPrice string `json:"unitPrice"`
@@ -1019,14 +1012,13 @@ type FinalizationDataType struct {
 ////////////////////////////////////////////////////////////////////////////
 //
 type FrConfigType struct {
-	Kind                 string                    `json:"kind"`
-	Description          string                    `json:"description"`
-	LastModifiedTime     string                    `json:"lastModifiedTime"`
-	IsLocked             *bool                     `json:"isLocked"`
-	Neighborhoods        []NeighborhoodsType       `json:"neighborhoods"`
-	MulchDeliveryConfigs []MulchDeliveryConfigType `json:"mulchDeliveryConfigs"`
-	Products             []ProductType             `json:"products"`
-	FinalizationData     *FinalizationDataType     `json:"finalizationData"`
+	Kind                 string                     `json:"kind"`
+	Description          string                     `json:"description"`
+	LastModifiedTime     string                     `json:"lastModifiedTime"`
+	IsLocked             *bool                      `json:"isLocked"`
+	MulchDeliveryConfigs *[]MulchDeliveryConfigType `json:"mulchDeliveryConfigs"`
+	Products             []ProductType              `json:"products"`
+	FinalizationData     *FinalizationDataType      `json:"finalizationData"`
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -1050,9 +1042,6 @@ func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
 		case "lastModifiedTime" == gqlField:
 			params = append(params, &frConfig.LastModifiedTime)
 			sqlFields = append(sqlFields, "last_modified_time::string")
-		case "neighborhoods" == gqlField:
-			params = append(params, &frConfig.Neighborhoods)
-			sqlFields = append(sqlFields, "neighborhoods::jsonb")
 		case "mulchDeliveryConfigs" == gqlField:
 			params = append(params, &frConfig.MulchDeliveryConfigs)
 			sqlFields = append(sqlFields, "mulch_delivery_configs::jsonb")
@@ -1066,6 +1055,7 @@ func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
 			params = append(params, &frConfig.IsLocked)
 			sqlFields = append(sqlFields, "is_locked")
 		case "users" == gqlField:
+		case "neighborhoods" == gqlField:
 			//Skipping because it is handled seperately
 		default:
 			return frConfig, errors.New(fmt.Sprintf("Unknown fundraiser config field: %s", gqlField))
@@ -1102,21 +1092,15 @@ func FrConfigType2Sql(frConfig FrConfigType) ([]string, []string, []interface{})
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
 		valIdx++
 	}
-	if len(frConfig.Neighborhoods) != 0 {
-		sqlFields = append(sqlFields, "neighborhoods")
-		values = append(values, frConfig.Neighborhoods)
-		valIdxs = append(valIdxs, fmt.Sprintf("$%d::jsonb", valIdx))
-		valIdx++
-	}
 	if len(frConfig.Products) != 0 {
 		sqlFields = append(sqlFields, "products")
 		values = append(values, frConfig.Products)
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::jsonb", valIdx))
 		valIdx++
 	}
-	if len(frConfig.MulchDeliveryConfigs) != 0 {
+	if nil != frConfig.MulchDeliveryConfigs {
 		sqlFields = append(sqlFields, "mulch_delivery_configs")
-		values = append(values, frConfig.MulchDeliveryConfigs)
+		values = append(values, *frConfig.MulchDeliveryConfigs)
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::jsonb", valIdx))
 		valIdx++
 	}
@@ -1143,12 +1127,15 @@ func FrConfigType2Sql(frConfig FrConfigType) ([]string, []string, []interface{})
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, error) {
+func setFundraiserConfigWithTrxn(ctx context.Context, trxn *pgxpool.Tx, frConfig FrConfigType) error {
 	frConfig.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
-	log.Println("Setting Fundraiding Config: ", frConfig)
+	log.Println("Setting Fundraiding Config (with Trxn): ", frConfig)
 
-	if err := verifyAdminTokenFromCtx(ctx); err != nil {
-		return false, err
+	log.Println("Deleting existing record")
+	_, err = trxn.Exec(context.Background(), "delete from fundraiser_config")
+	if err != nil {
+		trxn.Rollback(context.Background())
+		return err
 	}
 
 	sqlFields, valIdxs, values := FrConfigType2Sql(frConfig)
@@ -1156,24 +1143,31 @@ func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, erro
 	sqlCmd := fmt.Sprintf("insert into fundraiser_config(%s) values (%s)",
 		strings.Join(sqlFields, ","), strings.Join(valIdxs, ","))
 
+	log.Println("Setting Config SqlCmd: ", sqlCmd)
+	_, err = trxn.Exec(context.Background(), sqlCmd, values...)
+	if err != nil {
+		trxn.Rollback(context.Background())
+		return err
+	}
+	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, error) {
+	log.Println("Setting Fundraiding Config: ", frConfig)
+
+	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
 	// Start Database Operations
 	trxn, err := Db.Begin(context.Background())
 	if err != nil {
 		return false, err
 	}
 
-	log.Println("Deleting existing record")
-	_, err = trxn.Exec(context.Background(), "delete from fundraiser_config")
-	if err != nil {
-		trxn.Rollback(context.Background())
-		return false, err
-	}
-	log.Println("Setting Config SqlCmd: ", sqlCmd)
-	_, err = trxn.Exec(context.Background(), sqlCmd, values...)
-	if err != nil {
-		trxn.Rollback(context.Background())
-		return false, err
-	}
+	err = setFundraiserConfigWithTrxn(ctx, &trxn, frconfig)
 
 	log.Println("About to make a commitment")
 	err = trxn.Commit(context.Background())
@@ -1206,6 +1200,166 @@ func UpdateFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, e
 
 	log.Println("Update Config SqlCmd: ", sqlCmd)
 	_, err := Db.Exec(context.Background(), sqlCmd, values...)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+type NeighborhoodInfo struct {
+	Name              string `json: name`
+	Zipcode           int    `json: zipcode`
+	City              string `json: city`
+	IsVisible         bool   `json: is_visible`
+	DistributionPoint string `json:"distributionPoint"`
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func GetNeighborhoods(gqlFields []string) ([]NeighborhoodInfo, error) {
+
+	log.Println("Retrieving Fundraiser Users")
+
+	neighborhoods := []NeighborhoodInfo{}
+	sqlFields := []string{}
+
+	for _, gqlField := range gqlFields {
+		switch {
+		case "name" == gqlField:
+			sqlFields = append(sqlFields, "name")
+		case "zipcode" == gqlField:
+			sqlFields = append(sqlFields, "zipcode")
+		case "city" == gqlField:
+			sqlFields = append(sqlFields, "city")
+		case "isVisible" == gqlField:
+			sqlFields = append(sqlFields, "is_visible")
+		case "distributionPoint" == gqlField:
+			sqlFields = append(sqlFields, "dist_pt")
+		default:
+			return users, errors.New(fmt.Sprintf("Unknown fundraiser neighborhood field: %s", gqlField))
+		}
+
+	}
+
+	sqlCmd := fmt.Sprintf("select %s from neighborhoods", strings.Join(sqlFields, ","))
+	rows, err := Db.Query(context.Background(), sqlCmd)
+	if err != nil {
+		log.Println("Neighborhood query failed", err)
+		return users, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		hood := NeighborhoodInfo{}
+		inputs := []interface{}{}
+		for _, gqlField := range gqlFields {
+			switch {
+			case "name" == gqlField:
+				inputs = append(inputs, &hood.Name)
+			case "zipcode" == gqlField:
+				inputs = append(inputs, &hood.Zipcode)
+			case "city" == gqlField:
+				inputs = append(inputs, &hood.City)
+			case "isVisible" == gqlField:
+				inputs = append(inputs, &hood.IsVisible)
+			case "distributionPoint" == gqlField:
+				inputs = append(inputs, &hood.DistributionPoint)
+			default:
+				return users, errors.New(fmt.Sprintf("Unknown fundraiser neighborhood field: %s", gqlField))
+			}
+
+		}
+		err = rows.Scan(inputs...)
+		if err != nil {
+			log.Println("Reading Neighborhood row failed: ", err)
+			continue
+		}
+		neighborhoods = append(neighborhoods, hood)
+	}
+
+	if rows.Err() != nil {
+		log.Println("Reading Neighborhood rows had an issue: ", err)
+		return []NeighborhoodInfo{}, err
+	}
+	return neighborhoods, nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func AddNeighborhoods(ctx context.Context, hoods []NeighborhoodInfo) (bool, error) {
+	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
+	log.Println("Adding Neighborhoods at: ", lastModifiedTime)
+
+	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
+	existingHoods, err := GetNeighborhoods([]string{"name"})
+	if err != nil {
+		return false, err
+	}
+
+	doesAlreadyExist := func(newHood string) bool {
+		for _, existingHood := range existingHoods {
+			if existingHood.Name == newHood {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Start Database Operations
+	trxn, err := Db.Begin(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	for _, hood := range hoods {
+		if doesAlreadyExist(hood.Name) {
+			log.Println("Neighborhood: ", hood.Name, " already exists")
+			continue
+		} else {
+			log.Println("Neighborhood: ", hood.Name, " does not exists")
+		}
+		// log.Println("Deleting existing record if it exists")
+		// _, err = trxn.Exec(context.Background(), "delete from users where id = $1", user.Id)
+		// if err != nil {
+		// 	trxn.Rollback(context.Background())
+		// 	return false, err
+		// }
+
+		sqlCmd := "insert into neighborhoods(name, zipcode, city, is_visible, dist_pt, last_modified_time) " +
+			"values ($1, $2, $3, $4, $5, $6::timestamp)"
+		log.Println("Adding neighborhood SqlCmd: ", sqlCmd)
+		_, err = trxn.Exec(context.Background(),
+			sqlCmd,
+			hood.Name,
+			hood.Zipcode,
+			hood.City,
+			hood.IsVisible,
+			hood.DistributionPoint,
+			lastModifiedTime)
+		if err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
+		existingHoods = append(existingHoods, hood)
+	}
+
+	// Even though neighborhoods aren't a part of the fundariser config table we still treat it like it is so
+	// trigger time update to force re-download of config data.
+	sqlCmd2 := "UPDATE fundraiser_config SET last_modified_time=$1::timestamp WHERE last_modified_time=(SELECT last_modified_time FROM fundraiser_config LIMIT 1)"
+	_, err = trxn.Exec(context.Background(), sqlCmd2, lastModifiedTime)
+	if err != nil {
+		trxn.Rollback(context.Background())
+		return false, err
+	}
+
+	log.Println("About to make a commitment")
+	err = trxn.Commit(context.Background())
 	if err != nil {
 		return false, err
 	}
@@ -1367,10 +1521,11 @@ func SetMulchTimecards(ctx context.Context, timecards []MulchTimecardType) (bool
 ////////////////////////////////////////////////////////////////////////////
 //
 type UserInfo struct {
-	Name     string `json:"name"`
-	Id       string `json:"id"`
-	Group    string `json:"group"`
-	Password string `json:"password,omitempty"`
+	FirstName    string `json:"firstName"`
+	LastName     string `json:"lastName"`
+	Id           string `json:"id"`
+	Group        string `json:"group"`
+	HasAuthCreds bool   `json:"hasAuthCreds,omitempty"`
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -1384,12 +1539,16 @@ func GetUsers(gqlFields []string) ([]UserInfo, error) {
 
 	for _, gqlField := range gqlFields {
 		switch {
-		case "name" == gqlField:
-			sqlFields = append(sqlFields, "name")
+		case "firstName" == gqlField:
+			sqlFields = append(sqlFields, "first_name")
+		case "lastName" == gqlField:
+			sqlFields = append(sqlFields, "last_name")
 		case "id" == gqlField:
 			sqlFields = append(sqlFields, "id")
 		case "group" == gqlField:
 			sqlFields = append(sqlFields, "group_id")
+		case "hasAuthCreds" == gqlField:
+			sqlFields = append(sqlFields, "has_auth_creds")
 		default:
 			return users, errors.New(fmt.Sprintf("Unknown fundraiser user field: %s", gqlField))
 		}
@@ -1409,12 +1568,16 @@ func GetUsers(gqlFields []string) ([]UserInfo, error) {
 		inputs := []interface{}{}
 		for _, gqlField := range gqlFields {
 			switch {
-			case "name" == gqlField:
-				inputs = append(inputs, &user.Name)
+			case "firstName" == gqlField:
+				inputs = append(inputs, &user.FirstName)
+			case "lastName" == gqlField:
+				inputs = append(inputs, &user.LastName)
 			case "id" == gqlField:
 				inputs = append(inputs, &user.Id)
 			case "group" == gqlField:
 				inputs = append(inputs, &user.Group)
+			case "hasAuthCreds" == gqlField:
+				inputs = append(inputs, &user.HasAuthCreds)
 			default:
 				return users, errors.New(fmt.Sprintf("Unknown fundraiser user field: %s", gqlField))
 			}
@@ -1435,148 +1598,86 @@ func GetUsers(gqlFields []string) ([]UserInfo, error) {
 	return users, nil
 }
 
-// type CreateUserAppMeta struct {
-// 	FullName string `json:"full_name"`
-// }
+////////////////////////////////////////////////////////////////////////////
 //
-// type CreateUser struct {
-// 	Email         string            `json:"email"`
-// 	EmailVerified bool              `json:"email_verified"`
-// 	AppMeta       CreateUserAppMeta `json:"app_metadata"`
-// 	Nickname      string            `json:"nickname"`
-// 	Connection    string            `json:"connection"`
-// 	VerifyEmail   bool              `json:"verify_email"`
-// 	Password      string            `json:"password"`
-// }
+func AddUsers(ctx context.Context, users []UserInfo) (bool, error) {
+	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
+	log.Println("Setting Users at: ", lastModifiedTime)
 
-// ////////////////////////////////////////////////////////////////////////////
-// //
-// func createUser(user *UserInfo, jwt *string) error {
-//
-// 	param := CreateUser{
-// 		Email:         user.Id + "@bsatroop27.us",
-// 		EmailVerified: true,
-// 		AppMeta: CreateUserAppMeta{
-// 			FullName: user.Name,
-// 		},
-// 		Nickname:    user.Id,
-// 		Connection:  "Username-Password-Authentication",
-// 		VerifyEmail: false,
-// 		Password:    user.Password,
-// 	}
-//
-// 	paramInBytes, err := json.Marshal(param)
-// 	if err != nil {
-// 		return errors.New(fmt.Sprint("Failed to marshal user. Err:", err))
-// 	}
-//
-// 	url := fmt.Sprint(os.Getenv("AUTH0_BASE_URL"), "api/v2/users")
-// 	payload := strings.NewReader(string(paramInBytes))
-//
-// 	req, err := http.NewRequest("POST", url, payload)
-// 	if err != nil {
-// 		return errors.New(fmt.Sprint("Failed creating request. Err: ", err))
-// 	}
-// 	req.Header.Add("content-type", "application/json")
-// 	req.Header.Add("authorization", "Bearer "+*jwt)
-//
-// 	res, err := http.DefaultClient.Do(req)
-// 	if err != nil {
-// 		log.Println(res)
-// 		return errors.New(fmt.Sprint("Failed making request. Err: ", err))
-// 	}
-//
-// 	defer res.Body.Close()
-// 	body, _ := io.ReadAll(res.Body)
-// 	log.Println(string(body))
-// 	return nil
-// }
-//
-// ////////////////////////////////////////////////////////////////////////////
-// //
-// func AddUsers(ctx context.Context, users []UserInfo, jwt string) (bool, error) {
-// 	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
-// 	log.Println("Setting Users at: ", lastModifiedTime)
-//
-// 	if err := verifyAdminTokenFromCtx(ctx); err != nil {
-// 		return false, err
-// 	}
-//
-// 	existingUsers, err := GetUsers([]string{"id"})
-// 	if err != nil {
-// 		return false, err
-// 	}
-//
-// 	doesAlreadyExist := func(uid string) bool {
-// 		for _, existingUser := range existingUsers {
-// 			if existingUser.Id == uid {
-// 				return true
-// 			}
-// 		}
-// 		return false
-// 	}
-//
-// 	// Start Database Operations
-// 	trxn, err := Db.Begin(context.Background())
-// 	if err != nil {
-// 		return false, err
-// 	}
-//
-// 	for _, user := range users {
-// 		if doesAlreadyExist(user.Id) {
-// 			log.Println("User: ", user.Id, " already exists")
-// 			continue
-// 		} else {
-// 			log.Println("User: ", user.Id, " does not exists")
-// 		}
-// 		// log.Println("Deleting existing record if it exists")
-// 		// _, err = trxn.Exec(context.Background(), "delete from users where id = $1", user.Id)
-// 		// if err != nil {
-// 		// 	trxn.Rollback(context.Background())
-// 		// 	return false, err
-// 		// }
-//
-// 		sqlCmd := "insert into users(id, name, group_id) values ($1, $2, $3)"
-// 		log.Println("Adding user SqlCmd: ", sqlCmd)
-// 		_, err = trxn.Exec(context.Background(), sqlCmd, user.Id, user.Name, user.Group)
-// 		if err != nil {
-// 			trxn.Rollback(context.Background())
-// 			return false, err
-// 		}
-// 		existingUsers = append(existingUsers, user)
-// 	}
-//
-// 	sqlCmd2 := "UPDATE fundraiser_config SET last_modified_time=$1::timestamp WHERE last_modified_time=(SELECT last_modified_time FROM fundraiser_config LIMIT 1)"
-// 	_, err = trxn.Exec(context.Background(), sqlCmd2, lastModifiedTime)
-// 	if err != nil {
-// 		trxn.Rollback(context.Background())
-// 		return false, err
-// 	}
-//
-// 	log.Println("About to make a commitment")
-// 	err = trxn.Commit(context.Background())
-// 	if err != nil {
-// 		return false, err
-// 	}
-//
-// 	if len(jwt) <= 0 {
-// 		jwt = os.Getenv("AUTH0_ADMIN_TOKEN")
-// 	}
-//
-// 	// Now go back through looking for password and if present create the account
-// 	if len(jwt) > 0 {
-// 		for _, user := range users {
-// 			if len(user.Password) <= 0 {
-// 				continue
-// 			}
-// 			if err := createUser(&user, &jwt); err != nil {
-// 				log.Println("Failed creating user: ", err)
-// 			}
-// 		}
-// 	}
-//
-// 	return true, nil
-// }
+	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
+	existingUsers, err := GetUsers([]string{"id"})
+	if err != nil {
+		return false, err
+	}
+
+	doesAlreadyExist := func(uid string) bool {
+		for _, existingUser := range existingUsers {
+			if existingUser.Id == uid {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Start Database Operations
+	trxn, err := Db.Begin(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	for _, user := range users {
+		if doesAlreadyExist(user.Id) {
+			log.Println("User: ", user.Id, " already exists")
+			continue
+		} else {
+			log.Println("User: ", user.Id, " does not exists")
+		}
+		// log.Println("Deleting existing record if it exists")
+		// _, err = trxn.Exec(context.Background(), "delete from users where id = $1", user.Id)
+		// if err != nil {
+		// 	trxn.Rollback(context.Background())
+		// 	return false, err
+		// }
+
+		sqlCmd := "insert into users(id, user.first_name, user.last_name, group_id, has_auth_creds, last_modified_time, created_time) " +
+			"values ($1, $2, $3, $4, $5::timestamp, $6::timestamp)"
+		log.Println("Adding user SqlCmd: ", sqlCmd)
+		_, err = trxn.Exec(context.Background(),
+			sqlCmd,
+			user.Id,
+			user.FirstName,
+			user.LastName,
+			user.Group,
+			false,
+			lastModifiedTime,
+			lastModifiedTime)
+		if err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
+		existingUsers = append(existingUsers, user)
+	}
+
+	// Even though users aren't a part of the fundariser config table we still treat it like it is so
+	// trigger time update to force re-download of config data.
+	sqlCmd2 := "UPDATE fundraiser_config SET last_modified_time=$1::timestamp WHERE last_modified_time=(SELECT last_modified_time FROM fundraiser_config LIMIT 1)"
+	_, err = trxn.Exec(context.Background(), sqlCmd2, lastModifiedTime)
+	if err != nil {
+		trxn.Rollback(context.Background())
+		return false, err
+	}
+
+	log.Println("About to make a commitment")
+	err = trxn.Commit(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
 
 ////////////////////////////////////////////////////////////////////////////
 //
@@ -1809,6 +1910,57 @@ func SetFrCloseoutAllocations(ctx context.Context, allocations []AllocationItemT
 		}
 
 	}
+	log.Println("About to make a commitment")
+	err = trxn.Commit(context.Background())
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func ResetFundraisingData(ctx context.Context, doResetUsers bool, doResetOrders bool) (bool, error) {
+	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
+	log.Println("Setting Fr Data: users: %t  doResetOrders: %t", doResetUsers, doResetOrders)
+
+	if !(doResetUsers || doResetOrders) {
+		// Was told not to reset anything
+		return true, nil
+	}
+	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
+	trxn, err := Db.Begin(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	if doResetUsers {
+		log.Println("Deleting users data ")
+		_, err = trxn.Exec(context.Background(), "drop table users")
+		if err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
+	}
+
+	if doResetOrders {
+		log.Println("Deleting orders data")
+		_, err = trxn.Exec(context.Background(), "drop table allocation_summary, mulch_delivery_timecards, mulch_orders, mulch_spreaders")
+		if err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
+
+		// Always do timestamp
+		sqlFields = append(sqlFields, "last_modified_time")
+		values = append(values, frConfig.LastModifiedTime)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::timestamp", valIdx))
+		return sqlFields, valIdxs, values
+	}
+
 	log.Println("About to make a commitment")
 	err = trxn.Commit(context.Background())
 	if err != nil {

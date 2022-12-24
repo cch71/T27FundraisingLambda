@@ -403,16 +403,83 @@ func init() {
 	}
 
 	//////////////////////////////////////////////////////////////////////////////
+	// Neighborhood Query/Input Types
+	neighborhoodInfoType := graphql.NewObject(graphql.ObjectConfig{
+		Name: "NeighborhoodConfigType",
+		Fields: graphql.Fields{
+			"name":              &graphql.Field{Type: graphql.String},
+			"zipcode":           &graphql.Field{Type: graphql.Int},
+			"city":              &graphql.Field{Type: graphql.String},
+			"isVisible":         &graphql.Field{Type: graphql.Boolean},
+			"distributionPoint": &graphql.Field{Type: graphql.String},
+		},
+	})
+	queryFields["neighborhoods"] = &graphql.Field{
+		Type:        graphql.NewList(neighborhoodInfoType),
+		Description: "Queries for list of neighborhoods",
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			gqlFields := getSelectedFields([]string{"neighborhoods"}, p)
+			return GetNeighborhoods(gqlFields)
+		},
+	}
+	// neighborhoodInputConfigType := graphql.NewInputObject(graphql.InputObjectConfig{
+	// 	Name: "NeighborhoodInputConfigType",
+	// 	Fields: graphql.InputObjectConfigFieldMap{
+	// 		"name":              &graphql.InputObjectFieldConfig{Type: graphql.String},
+	// 		"distributionPoint": &graphql.InputObjectFieldConfig{Type: graphql.String},
+	// 	},
+	// })
+	neighborhoodInputType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name:        "NeighborhoodInfoInputType",
+		Description: "Fundraiser Neighborhood Input",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"name":              &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"zipcode":           &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"city":              &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"isVisible":         &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
+			"distributionPoint": &graphql.InputObjectFieldConfig{Type: graphql.String},
+		},
+	})
+
+	mutationFields["addNeighborhood"] = &graphql.Field{
+		Type:        graphql.Boolean,
+		Description: "Add neighborhood(s) to system",
+		Args: graphql.FieldConfigArgument{
+			"neighborhoods": &graphql.ArgumentConfig{
+				Description: "List of neighborhoods",
+				Type:        graphql.NewList(neighborhoodInputType),
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// log.Println("Setting Config: ", p.Args["config"])
+			jsonString, err := json.Marshal(p.Args["neighborhoods"])
+			if err != nil {
+				log.Println("Error encoding JSON")
+				return nil, nil
+			}
+			hoods := []NeighborhoodInfo{}
+			if err := json.Unmarshal([]byte(jsonString), &hoods); err != nil {
+				log.Println("Error decoding JSON to NeighborhoodInfo")
+				return nil, nil
+			}
+			return AddNeighborhoods(p.Context, hoods)
+		},
+	}
+
+	//////////////////////////////////////////////////////////////////////////////
 	// User/Group Query/Input Types
 	userInfoType := graphql.NewObject(graphql.ObjectConfig{
 		Name:        "UserInfoType",
 		Description: "User Info Type",
 		Fields: graphql.Fields{
-			"name":  &graphql.Field{Type: graphql.String},
-			"id":    &graphql.Field{Type: graphql.String},
-			"group": &graphql.Field{Type: graphql.String},
+			"firstName":    &graphql.Field{Type: graphql.String},
+			"lastName":     &graphql.Field{Type: graphql.String},
+			"id":           &graphql.Field{Type: graphql.String},
+			"group":        &graphql.Field{Type: graphql.String},
+			"hasAuthCreds": &graphql.Field{Type: graphql.Boolean},
 		},
 	})
+
 	queryFields["users"] = &graphql.Field{
 		Type:        graphql.NewList(userInfoType),
 		Description: "Queries for list of users",
@@ -422,50 +489,42 @@ func init() {
 		},
 	}
 
-	// userInputType := graphql.NewInputObject(graphql.InputObjectConfig{
-	// 	Name:        "UserInfoInputType",
-	// 	Description: "Fundraiser user",
-	// 	Fields: graphql.InputObjectConfigFieldMap{
-	// 		"name":     &graphql.InputObjectFieldConfig{Type: graphql.String},
-	// 		"id":       &graphql.InputObjectFieldConfig{Type: graphql.String},
-	// 		"group":    &graphql.InputObjectFieldConfig{Type: graphql.String},
-	// 		"password": &graphql.InputObjectFieldConfig{Type: graphql.String},
-	// 	},
-	// })
+	userInputType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name:        "UserInfoInputType",
+		Description: "Fundraiser user",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"firstName": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"lastName":  &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"name":      &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"id":        &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"group":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+		},
+	})
 
-	// mutationFields["addUsers"] = &graphql.Field{
-	// 	Type:        graphql.Boolean,
-	// 	Description: "Add user(s) to system",
-	// 	Args: graphql.FieldConfigArgument{
-	// 		"users": &graphql.ArgumentConfig{
-	// 			Description: "List of users",
-	// 			Type:        graphql.NewList(userInputType),
-	// 		},
-	// 		"token": &graphql.ArgumentConfig{
-	// 			Description: "Token",
-	// 			Type:        graphql.String,
-	// 		},
-	// 	},
-	// 	Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-	// 		// log.Println("Setting Config: ", p.Args["config"])
-	// 		token := ""
-	// 		if val, ok := p.Args["token"]; ok {
-	// 			token = val.(string)
-	// 		}
-
-	// 		jsonString, err := json.Marshal(p.Args["users"])
-	// 		if err != nil {
-	// 			log.Println("Error encoding JSON")
-	// 			return nil, nil
-	// 		}
-	// 		users := []UserInfo{}
-	// 		if err := json.Unmarshal([]byte(jsonString), &users); err != nil {
-	// 			log.Println("Error decoding JSON to userinfo")
-	// 			return nil, nil
-	// 		}
-	// 		return AddUsers(p.Context, users, token)
-	// 	},
-	// }
+	mutationFields["addUsers"] = &graphql.Field{
+		Type:        graphql.Boolean,
+		Description: "Add user(s) to system",
+		Args: graphql.FieldConfigArgument{
+			"users": &graphql.ArgumentConfig{
+				Description: "List of users",
+				Type:        graphql.NewList(userInputType),
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// log.Println("Setting Config: ", p.Args["config"])
+			jsonString, err := json.Marshal(p.Args["users"])
+			if err != nil {
+				log.Println("Error encoding JSON")
+				return nil, nil
+			}
+			users := []UserInfo{}
+			if err := json.Unmarshal([]byte(jsonString), &users); err != nil {
+				log.Println("Error decoding JSON to userinfo")
+				return nil, nil
+			}
+			return AddUsers(p.Context, users)
+		},
+	}
 
 	//////////////////////////////////////////////////////////////////////////////
 	// Config Query Types
@@ -475,13 +534,6 @@ func init() {
 			"id":                 &graphql.Field{Type: graphql.Int},
 			"date":               &graphql.Field{Type: graphql.String},
 			"newOrderCutoffDate": &graphql.Field{Type: graphql.String},
-		},
-	})
-	neighborhoodConfigType := graphql.NewObject(graphql.ObjectConfig{
-		Name: "NeighborhoodConfigType",
-		Fields: graphql.Fields{
-			"name":              &graphql.Field{Type: graphql.String},
-			"distributionPoint": &graphql.Field{Type: graphql.String},
 		},
 	})
 	productPriceBreakConfigType := graphql.NewObject(graphql.ObjectConfig{
@@ -527,8 +579,8 @@ func init() {
 			"isLocked":             &graphql.Field{Type: graphql.Boolean},
 			"mulchDeliveryConfigs": &graphql.Field{Type: graphql.NewList(mulchDeliveryConfigType)},
 			"products":             &graphql.Field{Type: graphql.NewList(productConfigType)},
-			"neighborhoods":        &graphql.Field{Type: graphql.NewList(neighborhoodConfigType)},
 			"finalizationData":     &graphql.Field{Type: finalizationDataConfigType},
+			"neighborhoods":        queryFields["users"],
 			"users":                queryFields["users"],
 		},
 	})
@@ -547,13 +599,6 @@ func init() {
 			"id":                 &graphql.InputObjectFieldConfig{Type: graphql.Int},
 			"date":               &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"newOrderCutoffDate": &graphql.InputObjectFieldConfig{Type: graphql.String},
-		},
-	})
-	neighborhoodInputConfigType := graphql.NewInputObject(graphql.InputObjectConfig{
-		Name: "NeighborhoodInputConfigType",
-		Fields: graphql.InputObjectConfigFieldMap{
-			"name":              &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"distributionPoint": &graphql.InputObjectFieldConfig{Type: graphql.String},
 		},
 	})
 	productPriceBreakInputConfigType := graphql.NewInputObject(graphql.InputObjectConfig{
@@ -599,7 +644,6 @@ func init() {
 			"isLocked":             &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
 			"mulchDeliveryConfigs": &graphql.InputObjectFieldConfig{Type: graphql.NewList(mulchDeliveryInputConfigType)},
 			"products":             &graphql.InputObjectFieldConfig{Type: graphql.NewList(productInputConfigType)},
-			"neighborhoods":        &graphql.InputObjectFieldConfig{Type: graphql.NewList(neighborhoodInputConfigType)},
 			"finalizationData":     &graphql.InputObjectFieldConfig{Type: finalizationDataInputConfigType},
 		},
 	})
@@ -710,6 +754,7 @@ func init() {
 			return CreateIssue(issue)
 		},
 	}
+
 	//////////////////////////////////////////////////////////////////////////////
 	// Set Fundraiser closeout allocations
 	allocationsInputType := graphql.NewInputObject(graphql.InputObjectConfig{
@@ -783,9 +828,6 @@ func init() {
 		},
 	}
 
-	// Deprecated for the more generic "summary" query
-	queryFields["summaryByOwnerId"] = &orderOwnerSummary
-
 	troopSummaryByGroupType := graphql.NewObject(graphql.ObjectConfig{
 		Name:        "TroopSummaryByGroupType",
 		Description: "Summary information for the different patrols",
@@ -828,9 +870,6 @@ func init() {
 		},
 	}
 
-	// Deprecated for the more generic "summary" query
-	queryFields["troopSummary"] = &troopSummary
-
 	neighborhoodSummaryType := graphql.NewObject(graphql.ObjectConfig{
 		Name: "NeighborhoodSummaryType",
 		Fields: graphql.Fields{
@@ -846,9 +885,6 @@ func init() {
 			return GetNeighborhoodSummary()
 		},
 	}
-
-	// Deprecated for the more generic "summary" query
-	queryFields["neighborhoodsSummary"] = &neighborhoodsSummary
 
 	summaryType := graphql.NewObject(graphql.ObjectConfig{
 		Name:        "SummaryType",
@@ -873,6 +909,34 @@ func init() {
 			return Shimmer{}, nil
 		},
 	}
+
+	//////////////////////////////////////////////////////////////////////////////
+	// Resets Fundraiser User and Order Data
+	mutationFields["resetFundraisingData"] = &graphql.Field{
+		Type:        graphql.Boolean,
+		Description: "ResetFundraiser",
+		Args: graphql.FieldConfigArgument{
+			"doResetUsers": &graphql.ArgumentConfig{
+				Description: "Resets users list",
+				Type:        graphql.Boolean,
+			},
+			"doResetOrders": &graphql.ArgumentConfig{
+				Description: "Resets mulch orders, mulch spreaders, allocation summary, mulch delivery config, finalization data, and time cards data",
+				Type:        graphql.Boolean,
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			doResetUsers, doResetOrders := false
+			if val, ok := p.args["doResetUsers"]; ok {
+				doResetUsers = val.(bool)
+			}
+			if val, ok := p.args["doResetOrders"]; ok {
+				doResetOrders = val.(bool)
+			}
+			return ResetFundraisingData(p.Context, doResetUsers, doResetOrders)
+		},
+	}
+
 	// queryFields["testApi"] = &graphql.Field{
 	// 	Type:        graphql.Boolean,
 	// 	Description: "",
