@@ -354,9 +354,9 @@ type TroopSummaryType struct {
 func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
 	log.Println("Getting Troop Summary with this many top sellers: ", numTopSellers)
 
-	sqlCmd := "select users.name, users.group_id, sum(total_amount_collected)::string from mulch_orders" +
+	sqlCmd := "select users.first_name, users.last_name, users.group_id, sum(total_amount_collected)::string from mulch_orders" +
 		" inner join users on (mulch_orders.order_owner_id = users.id) where" +
-		" total_amount_collected is not null group by order_owner_id, users.name, users.group_id"
+		" total_amount_collected is not null group by order_owner_id, users.first_name, users.last_name, users.group_id"
 
 	rows, err := Db.Query(context.Background(), sqlCmd)
 	if err != nil {
@@ -370,11 +370,12 @@ func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
 	topSellers := []TopSellerType{}
 
 	for rows.Next() {
-		var name string
+		var firstName string
+		var lastName string
 		var group string
 		var totalAsStr string
 
-		err = rows.Scan(&name, &group, &totalAsStr)
+		err = rows.Scan(&firstName, &lastName, &group, &totalAsStr)
 		if err != nil {
 			log.Println("Reading Summary row failed: ", err)
 			return TroopSummaryType{}, err
@@ -391,7 +392,7 @@ func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
 			groupTotals[group] = total
 		}
 
-		topSellers = append(topSellers, TopSellerType{Name: name, TotalAmountCollected: totalAsStr})
+		topSellers = append(topSellers, TopSellerType{Name: fmt.Sprintf("%s %s", firstName, lastName), TotalAmountCollected: totalAsStr})
 	}
 
 	if rows.Err() != nil {
