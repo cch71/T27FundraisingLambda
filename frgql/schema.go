@@ -467,6 +467,7 @@ func init() {
 		Fields: graphql.Fields{
 			"firstName":    &graphql.Field{Type: graphql.String},
 			"lastName":     &graphql.Field{Type: graphql.String},
+			"name":         &graphql.Field{Type: graphql.String},
 			"id":           &graphql.Field{Type: graphql.String},
 			"group":        &graphql.Field{Type: graphql.String},
 			"hasAuthCreds": &graphql.Field{Type: graphql.Boolean},
@@ -488,7 +489,6 @@ func init() {
 		Fields: graphql.InputObjectConfigFieldMap{
 			"firstName": &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"lastName":  &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"name":      &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"id":        &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"group":     &graphql.InputObjectFieldConfig{Type: graphql.String},
 		},

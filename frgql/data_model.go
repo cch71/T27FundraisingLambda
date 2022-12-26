@@ -1596,6 +1596,7 @@ func SetMulchTimecards(ctx context.Context, timecards []MulchTimecardType) (bool
 type UserInfo struct {
 	FirstName    string `json:"firstName"`
 	LastName     string `json:"lastName"`
+	Name         string `json:"name"`
 	Id           string `json:"id"`
 	Group        string `json:"group"`
 	HasAuthCreds bool   `json:"hasAuthCreds,omitempty"`
@@ -1608,24 +1609,41 @@ func GetUsers(gqlFields []string) ([]UserInfo, error) {
 	log.Println("Retrieving Fundraiser Users")
 
 	users := []UserInfo{}
-	sqlFields := []string{}
 
-	for _, gqlField := range gqlFields {
-		switch {
-		case "firstName" == gqlField:
-			sqlFields = append(sqlFields, "first_name")
-		case "lastName" == gqlField:
-			sqlFields = append(sqlFields, "last_name")
-		case "id" == gqlField:
-			sqlFields = append(sqlFields, "id")
-		case "group" == gqlField:
-			sqlFields = append(sqlFields, "group_id")
-		case "hasAuthCreds" == gqlField:
-			sqlFields = append(sqlFields, "has_auth_creds")
-		default:
-			return users, errors.New(fmt.Sprintf("Unknown fundraiser user field: %s", gqlField))
+	getSqlFields := func() ([]string, bool, error) {
+		sqlFieldSet := make(map[string]struct{})
+		sqlFields := []string{}
+		doWantFullNames := false
+		exists := struct{}{}
+		for _, gqlField := range gqlFields {
+			switch {
+			case "firstName" == gqlField:
+				sqlFieldSet["first_name"] = exists
+			case "lastName" == gqlField:
+				sqlFieldSet["last_name"] = exists
+			case "name" == gqlField:
+				doWantFullNames = true
+				sqlFieldSet["first_name"] = exists
+				sqlFieldSet["last_name"] = exists
+			case "id" == gqlField:
+				sqlFieldSet["id"] = exists
+			case "group" == gqlField:
+				sqlFieldSet["group_id"] = exists
+			case "hasAuthCreds" == gqlField:
+				sqlFieldSet["has_auth_creds"] = exists
+			default:
+				return sqlFields, false, errors.New(fmt.Sprintf("Unknown fundraiser user field: %s", gqlField))
+			}
 		}
+		for k, _ := range sqlFieldSet {
+			sqlFields = append(sqlFields, k)
+		}
+		return sqlFields, doWantFullNames, nil
+	}
 
+	sqlFields, doWantFullNames, err := getSqlFields()
+	if err != nil {
+		return users, err
 	}
 
 	sqlCmd := fmt.Sprintf("select %s from users", strings.Join(sqlFields, ","))
@@ -1660,6 +1678,9 @@ func GetUsers(gqlFields []string) ([]UserInfo, error) {
 		if err != nil {
 			log.Println("Reading User row failed: ", err)
 			continue
+		}
+		if doWantFullNames {
+			user.Name = fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 		}
 		users = append(users, user)
 	}
@@ -1996,7 +2017,7 @@ const MULCH_DELIVERY_TIMECARD_TABLE_SQL = "CREATE TABLE mulch_delivery_timecards
 const ALLOCATION_SUMMARY_TABLE_SQL = "CREATE TABLE allocation_summary (uid STRING PRIMARY KEY, bags_sold INT, bags_spread DECIMAL(13,4), delivery_minutes DECIMAL(13,4), total_donations DECIMAL(13,4), allocation_from_bags_sold DECIMAL(13,4), allocation_from_bags_spread DECIMAL(13,4), allocation_from_delivery DECIMAL(13,4), allocation_total DECIMAL(13,4))"
 
 const DROP_USERS_TABLE_SQL = "drop table users"
-const USERS_TABLE_SQL = "CREATE TABLE users (id STRING, group_id STRING, name STRING, created_time TIMESTAMP, last_modified_time TIMESTAMP, has_auth_creds BOOL)"
+const USERS_TABLE_SQL = "CREATE TABLE users (id STRING, group_id STRING, first_name STRING, last_name STRING, created_time TIMESTAMP, last_modified_time TIMESTAMP, has_auth_creds BOOL)"
 
 ////////////////////////////////////////////////////////////////////////////
 //

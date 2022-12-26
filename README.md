@@ -18,7 +18,7 @@ CREATE TABLE fundraiser_config (kind STRING PRIMARY KEY, description STRING, las
 CREATE TABLE neighborhoods (name STRING PRIMARY KEY, zipcode INTEGER, city STRING, dist_pt STRING, is_visible BOOL, last_modified_time TIMESTAMP, meta JSONB);
 ```
 ```
-CREATE TABLE users (id STRING, group_id STRING, name STRING, created_time TIMESTAMP, last_modified_time TIMESTAMP, has_auth_creds BOOL);
+CREATE TABLE users (id STRING, group_id STRING, first_name STRING, last_name STRING, created_time TIMESTAMP, last_modified_time TIMESTAMP, has_auth_creds BOOL);
 ```
 ```
 CREATE TABLE allocation_summary (uid STRING PRIMARY KEY, bags_sold INT, bags_spread DECIMAL(13,4), delivery_minutes DECIMAL(13,4), total_donations DECIMAL(13,4), allocation_from_bags_sold DECIMAL(13,4), allocation_from_bags_spread DECIMAL(13,4), allocation_from_delivery DECIMAL(13,4), allocation_total DECIMAL(13,4));
