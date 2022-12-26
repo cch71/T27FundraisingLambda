@@ -20,13 +20,13 @@ var (
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func loginKcAdmin(ctx context.Context) (*gocloak.GoCloak, token) {
+func loginKcAdmin(ctx context.Context) (*gocloak.GoCloak, string) {
 	client := gocloak.NewClient(os.Getenv("KEYCLOAK_URL"))
 	kcId := os.Getenv("KEYCLOAK_ID")
 	kcSecret := os.Getenv("KEYCLOAK_SECRET")
 	realm := os.Getenv("KEYCLOAK_REALM")
 
-	log.Printf("ID: %s, Secret: %s, Ream: %s", kcId, kcSecret, realm)
+	// log.Printf("ID: %s, Secret: %s, Ream: %s", kcId, kcSecret, realm)
 
 	token, err := client.LoginAdmin(ctx, kcId, kcSecret, realm)
 	if err != nil {
@@ -37,46 +37,47 @@ func loginKcAdmin(ctx context.Context) (*gocloak.GoCloak, token) {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func createKcUser(client *gocloak.GoCloak, token *string, user *UserInfo, password *string) error {
-
-	if err := frgql.verifyAdminTokenFromCtx(ctx); err != nil {
-		return false, err
-	}
-
-	kcUser := gocloak.User{
-		FirstName:     gocloak.StringP(user.FirstName),
-		LastName:      gocloak.StringP(user.LastName),
-		Email:         gocloak.StringP(user.Id + "@bsatroop27.us"),
-		EmailVerified: gocloak.BoolP(true),
-		Enabled:       gocloak.BoolP(true),
-		Username:      gocloak.StringP(user.Id),
-		Groups:        &[]string{"FrSellers"},
-	}
-
-	if user.Group == "Admin" {
-		kcUser.Groups = &[]string{"FrAdmins"}
-	}
-
-	userId, err := client.CreateUser(ctx, *token, realm, user)
-	if err != nil {
-		log.Fatalln("Oh no!, failed to create user: ", err.Error())
-	}
-	log.Printf("Created UserID: %s", userId)
-	err = client.SetPassword(ctx, token.AccessToken, userId, realm, "YUv4m*6NZqynEJ@aPMMWQkEk", false)
-	if err != nil {
-		log.Fatalln("Oh no!, failed to set user password: ", err.Error())
-	}
-	log.Printf("Password for UserID: %s set", userId)
-
-	return nil
-}
+// func createKcUser(ctx context.Context, client *gocloak.GoCloak, token *string, user *frgql.UserInfo, password *string) error {
+//
+// 	if err := frgql.VerifyAdminTokenFromCtx(ctx); err != nil {
+// 		return false, err
+// 	}
+//
+// 	kcUser := gocloak.User{
+// 		FirstName:     gocloak.StringP(user.FirstName),
+// 		LastName:      gocloak.StringP(user.LastName),
+// 		Email:         gocloak.StringP(user.Id + "@bsatroop27.us"),
+// 		EmailVerified: gocloak.BoolP(true),
+// 		Enabled:       gocloak.BoolP(true),
+// 		Username:      gocloak.StringP(user.Id),
+// 		Groups:        &[]string{"FrSellers"},
+// 	}
+//
+// 	if user.Group == "Admin" {
+// 		kcUser.Groups = &[]string{"FrAdmins"}
+// 	}
+//
+// 	realm := os.Getenv("KEYCLOAK_REALM")
+// 	userId, err := client.CreateUser(ctx, *token, realm, user)
+// 	if err != nil {
+// 		log.Fatalln("Oh no!, failed to create user: ", err.Error())
+// 	}
+// 	log.Printf("Created UserID: %s", userId)
+// 	err = client.SetPassword(ctx, token.AccessToken, userId, realm, pw, false)
+// 	if err != nil {
+// 		log.Fatalln("Oh no!, failed to set user password: ", err.Error())
+// 	}
+// 	log.Printf("Password for UserID: %s set", userId)
+//
+// 	return nil
+// }
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func createKcUsers(ctx context.Context, users *[]frgql.UserInfo) {
-
-	client, token := loginKcAdmin(ctx)
-}
+// func createKcUsers(ctx context.Context, users *[]frgql.UserInfo) {
+//
+// 	client, token := loginKcAdmin(ctx)
+// }
 
 ////////////////////////////////////////////////////////////////////////////
 //
@@ -254,7 +255,7 @@ func main() {
 	ctx := context.Background()
 
 	gqlCmd := flag.NewFlagSet("gql", flag.ExitOnError)
-	gqlCmdFilenameInPtr := flag.String("in", "", "GraphGQ File")
+	gqlCmdFilenameInPtr := gqlCmd.String("in", "", "GraphGQ File")
 
 	syncKcUsersCmd := flag.NewFlagSet("synckcusers", flag.ExitOnError)
 	syncKcUsersLocalDb := syncKcUsersCmd.String("db", "", "Local DB of Users")

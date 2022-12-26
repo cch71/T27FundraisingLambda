@@ -1,0 +1,290 @@
+
+mutation {
+  addNeighborhoods(neighborhoods: [
+      {
+         name: "Avery Ranch",
+         city: "Georgetown",
+         zipcode: 78628,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Behrens Ranch",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Bent Tree",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Brushy Creek (Austin)",
+         city: "Austin",
+         zipcode: 78717,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Brushy Creek (Cedar Park)",
+         city: "Austin",
+         zipcode: 78613,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Brushy Creek (Round Rock)",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Brushy Creek North",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Cat Hollow",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Chandler Creek (78664)",
+         city: "Round Rock",
+         zipcode: 78664,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Chandler Creek (78665)",
+         city: "Round Rock",
+         zipcode: 78665,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Deep Wood",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Deep Wood"
+      },{
+         name: "Eagle Ridge",
+         city: "Round Rock",
+         zipcode: 78665,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Enclave @ Mayfield Ranch",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Escalera Ranch",
+         city: "Georgetown",
+         zipcode: 78628,
+         isVisible: true,
+         distributionPoint: "Escalera"
+      },{
+         name: "Estates at Settlers Park",
+         city: "Round Rock",
+         zipcode: 78665,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Forest Bluffs",
+         city: "Round Rock",
+         zipcode: 78665,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Forest Creek",
+         city: "Round Rock",
+         zipcode: 78664,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Forest Creek Estates",
+         city: "Round Rock",
+         zipcode: 78664,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Forest Grove",
+         city: "Round Rock",
+         zipcode: 78665,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Forest Ridge",
+         city: "Round Rock",
+         zipcode: 78665,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Hidden Glen",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Highland Parks",
+         city: "Round Rock",
+         zipcode: 78664,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Huntington Trails",
+         city: "Round Rock",
+         zipcode: 78664,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Lake Forest",
+         city: "Round Rock",
+         zipcode: 78665,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Masters at Forest Creek",
+         city: "Round Rock",
+         zipcode: 78664,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Mayfield Ranch",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Meadow Lake",
+         city: "Round Rock",
+         zipcode: 78665,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Morningside Meadows",
+         city: "Round Rock",
+         zipcode: 78664,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Oak Bluff Estates",
+         city: "Round Rock",
+         zipcode: 78664,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Oak Brook",
+         city: "Austin",
+         zipcode: 78717,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Oak Hollow",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Paloma Lake",
+         city: "Round Rock",
+         zipcode: 78665,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Preserve @ Dyer Creek",
+         city: "Round Rock",
+         zipcode: 78665,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Round Rock West",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Deep Wood"
+      },{
+         name: "Ryans Crossing",
+         city: "Round Rock",
+         zipcode: 78665,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Sendero Springs",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Silver Leaf",
+         city: "Round Rock",
+         zipcode: 78664,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Sonoma",
+         city: "Round Rock",
+         zipcode: 78665,
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Stone Canyon",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Teravista (Round Rock)",
+         city: "Round Rock",
+         zipcode: 78665,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Teravista (Georgetown)",
+         city: "Georgetown",
+         zipcode: 78626,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "The Woods",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Tonkawa Springs",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Vista Oaks",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Walsh Ranch",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Wood Glen",
+         city: "Round Rock",
+         zipcode: 78681,
+         isVisible: true,
+         distributionPoint: "Walsh"
+      },{
+         name: "Out of Area East",
+         isVisible: true,
+         distributionPoint: "Forest Creek"
+      },{
+         name: "Out of Area West",
+         isVisible: true,
+         distributionPoint: "Walsh"
+      }
+  ])
+}

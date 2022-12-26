@@ -422,26 +422,19 @@ func init() {
 			return GetNeighborhoods(gqlFields)
 		},
 	}
-	// neighborhoodInputConfigType := graphql.NewInputObject(graphql.InputObjectConfig{
-	// 	Name: "NeighborhoodInputConfigType",
-	// 	Fields: graphql.InputObjectConfigFieldMap{
-	// 		"name":              &graphql.InputObjectFieldConfig{Type: graphql.String},
-	// 		"distributionPoint": &graphql.InputObjectFieldConfig{Type: graphql.String},
-	// 	},
-	// })
 	neighborhoodInputType := graphql.NewInputObject(graphql.InputObjectConfig{
 		Name:        "NeighborhoodInfoInputType",
 		Description: "Fundraiser Neighborhood Input",
 		Fields: graphql.InputObjectConfigFieldMap{
-			"name":              &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"name":              &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
 			"zipcode":           &graphql.InputObjectFieldConfig{Type: graphql.Int},
 			"city":              &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"isVisible":         &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
-			"distributionPoint": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"distributionPoint": &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
 		},
 	})
 
-	mutationFields["addNeighborhood"] = &graphql.Field{
+	mutationFields["addNeighborhoods"] = &graphql.Field{
 		Type:        graphql.Boolean,
 		Description: "Add neighborhood(s) to system",
 		Args: graphql.FieldConfigArgument{
@@ -580,7 +573,7 @@ func init() {
 			"mulchDeliveryConfigs": &graphql.Field{Type: graphql.NewList(mulchDeliveryConfigType)},
 			"products":             &graphql.Field{Type: graphql.NewList(productConfigType)},
 			"finalizationData":     &graphql.Field{Type: finalizationDataConfigType},
-			"neighborhoods":        queryFields["users"],
+			"neighborhoods":        queryFields["neighborhoods"],
 			"users":                queryFields["users"],
 		},
 	})
@@ -926,11 +919,11 @@ func init() {
 			},
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			doResetUsers, doResetOrders := false
-			if val, ok := p.args["doResetUsers"]; ok {
+			doResetUsers, doResetOrders := false, false
+			if val, ok := p.Args["doResetUsers"]; ok {
 				doResetUsers = val.(bool)
 			}
-			if val, ok := p.args["doResetOrders"]; ok {
+			if val, ok := p.Args["doResetOrders"]; ok {
 				doResetOrders = val.(bool)
 			}
 			return ResetFundraisingData(p.Context, doResetUsers, doResetOrders)

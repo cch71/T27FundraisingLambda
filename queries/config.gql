@@ -6,6 +6,9 @@
     lastModifiedTime
     neighborhoods {
       name
+      city
+      zipcode
+      isVisible
       distributionPoint
     }
     mulchDeliveryConfigs {

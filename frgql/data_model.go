@@ -133,7 +133,7 @@ func parseTokenClaimsFromCtx(ctx context.Context) (*T27FrClaims, error) {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func verifyAdminTokenFromCtx(ctx context.Context) error {
+func VerifyAdminTokenFromCtx(ctx context.Context) error {
 	claims, err := parseTokenClaimsFromCtx(ctx)
 	if err != nil {
 		return err
@@ -1127,14 +1127,13 @@ func FrConfigType2Sql(frConfig FrConfigType) ([]string, []string, []interface{})
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func setFundraiserConfigWithTrxn(ctx context.Context, trxn *pgxpool.Tx, frConfig FrConfigType) error {
+func setFundraiserConfigWithTrxn(ctx context.Context, trxn *pgx.Tx, frConfig FrConfigType) error {
 	frConfig.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
 	log.Println("Setting Fundraiding Config (with Trxn): ", frConfig)
 
 	log.Println("Deleting existing record")
-	_, err = trxn.Exec(context.Background(), "delete from fundraiser_config")
+	_, err := (*trxn).Exec(context.Background(), "delete from fundraiser_config")
 	if err != nil {
-		trxn.Rollback(context.Background())
 		return err
 	}
 
@@ -1144,9 +1143,8 @@ func setFundraiserConfigWithTrxn(ctx context.Context, trxn *pgxpool.Tx, frConfig
 		strings.Join(sqlFields, ","), strings.Join(valIdxs, ","))
 
 	log.Println("Setting Config SqlCmd: ", sqlCmd)
-	_, err = trxn.Exec(context.Background(), sqlCmd, values...)
+	_, err = (*trxn).Exec(context.Background(), sqlCmd, values...)
 	if err != nil {
-		trxn.Rollback(context.Background())
 		return err
 	}
 	return nil
@@ -1157,7 +1155,7 @@ func setFundraiserConfigWithTrxn(ctx context.Context, trxn *pgxpool.Tx, frConfig
 func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, error) {
 	log.Println("Setting Fundraiding Config: ", frConfig)
 
-	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
 		return false, err
 	}
 
@@ -1167,7 +1165,10 @@ func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, erro
 		return false, err
 	}
 
-	err = setFundraiserConfigWithTrxn(ctx, &trxn, frconfig)
+	if err := setFundraiserConfigWithTrxn(ctx, &trxn, frConfig); err != nil {
+		trxn.Rollback(context.Background())
+		return false, err
+	}
 
 	log.Println("About to make a commitment")
 	err = trxn.Commit(context.Background())
@@ -1179,13 +1180,9 @@ func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, erro
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func UpdateFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, error) {
+func updateFundraiserConfigWithTrxn(ctx context.Context, trxn *pgx.Tx, frConfig FrConfigType) error {
 	frConfig.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
-	log.Println("Updating Fundraiding Config: ", frConfig)
-
-	if err := verifyAdminTokenFromCtx(ctx); err != nil {
-		return false, err
-	}
+	log.Println("Updating Fundraiding Config (with Trxn): ", frConfig)
 
 	sqlFields, valIdxs, values := FrConfigType2Sql(frConfig)
 
@@ -1199,7 +1196,36 @@ func UpdateFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, e
 		strings.Join(updateSqlFlds, ","))
 
 	log.Println("Update Config SqlCmd: ", sqlCmd)
-	_, err := Db.Exec(context.Background(), sqlCmd, values...)
+	_, err := (*trxn).Exec(context.Background(), sqlCmd, values...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func UpdateFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, error) {
+	frConfig.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
+	log.Println("Updating Fundraiding Config")
+
+	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
+	// Start Database Operations
+	trxn, err := Db.Begin(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	if err := updateFundraiserConfigWithTrxn(ctx, &trxn, frConfig); err != nil {
+		trxn.Rollback(context.Background())
+		return false, err
+	}
+
+	log.Println("About to make a commitment")
+	err = trxn.Commit(context.Background())
 	if err != nil {
 		return false, err
 	}
@@ -1210,18 +1236,19 @@ func UpdateFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, e
 ////////////////////////////////////////////////////////////////////////////
 //
 type NeighborhoodInfo struct {
-	Name              string `json: name`
-	Zipcode           int    `json: zipcode`
-	City              string `json: city`
-	IsVisible         bool   `json: is_visible`
-	DistributionPoint string `json:"distributionPoint"`
+	Name              string  `json: name`
+	Zipcode           *int    `json: zipcode`
+	City              *string `json: city`
+	IsVisible         *bool   `json: is_visible`
+	DistributionPoint *string `json:"distributionPoint"`
+	LastModifiedTime  string  `json:"lastModifiedTime"`
 }
 
 ////////////////////////////////////////////////////////////////////////////
 //
 func GetNeighborhoods(gqlFields []string) ([]NeighborhoodInfo, error) {
 
-	log.Println("Retrieving Fundraiser Users")
+	log.Println("Retrieving Fundraiser Neighborhoods")
 
 	neighborhoods := []NeighborhoodInfo{}
 	sqlFields := []string{}
@@ -1239,7 +1266,7 @@ func GetNeighborhoods(gqlFields []string) ([]NeighborhoodInfo, error) {
 		case "distributionPoint" == gqlField:
 			sqlFields = append(sqlFields, "dist_pt")
 		default:
-			return users, errors.New(fmt.Sprintf("Unknown fundraiser neighborhood field: %s", gqlField))
+			return neighborhoods, errors.New(fmt.Sprintf("Unknown fundraiser neighborhood field: %s", gqlField))
 		}
 
 	}
@@ -1248,7 +1275,7 @@ func GetNeighborhoods(gqlFields []string) ([]NeighborhoodInfo, error) {
 	rows, err := Db.Query(context.Background(), sqlCmd)
 	if err != nil {
 		log.Println("Neighborhood query failed", err)
-		return users, err
+		return neighborhoods, err
 	}
 	defer rows.Close()
 
@@ -1268,7 +1295,7 @@ func GetNeighborhoods(gqlFields []string) ([]NeighborhoodInfo, error) {
 			case "distributionPoint" == gqlField:
 				inputs = append(inputs, &hood.DistributionPoint)
 			default:
-				return users, errors.New(fmt.Sprintf("Unknown fundraiser neighborhood field: %s", gqlField))
+				return neighborhoods, errors.New(fmt.Sprintf("Unknown fundraiser neighborhood field: %s", gqlField))
 			}
 
 		}
@@ -1289,11 +1316,57 @@ func GetNeighborhoods(gqlFields []string) ([]NeighborhoodInfo, error) {
 
 ////////////////////////////////////////////////////////////////////////////
 //
+func FrHoodType2Sql(hood NeighborhoodInfo) ([]string, []string, []interface{}) {
+	values := []interface{}{}
+	sqlFields := []string{}
+	valIdxs := []string{}
+	valIdx := 1
+	if len(hood.Name) != 0 {
+		sqlFields = append(sqlFields, "name")
+		values = append(values, hood.Name)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+	if nil != hood.Zipcode {
+		sqlFields = append(sqlFields, "zipcode")
+		values = append(values, *hood.Zipcode)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::int", valIdx))
+		valIdx++
+	}
+	if nil != hood.City {
+		sqlFields = append(sqlFields, "city")
+		values = append(values, *hood.City)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+	if nil != hood.DistributionPoint {
+		sqlFields = append(sqlFields, "dist_pt")
+		values = append(values, *hood.DistributionPoint)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+	if nil != hood.IsVisible {
+		// Unfortunately hard to detect if this is set or not
+		sqlFields = append(sqlFields, "is_visible")
+		values = append(values, *hood.IsVisible)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::bool", valIdx))
+		valIdx++
+	}
+
+	// Always do timestamp
+	sqlFields = append(sqlFields, "last_modified_time")
+	values = append(values, hood.LastModifiedTime)
+	valIdxs = append(valIdxs, fmt.Sprintf("$%d::timestamp", valIdx))
+	return sqlFields, valIdxs, values
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
 func AddNeighborhoods(ctx context.Context, hoods []NeighborhoodInfo) (bool, error) {
 	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
 	log.Println("Adding Neighborhoods at: ", lastModifiedTime)
 
-	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
 		return false, err
 	}
 
@@ -1317,6 +1390,7 @@ func AddNeighborhoods(ctx context.Context, hoods []NeighborhoodInfo) (bool, erro
 		return false, err
 	}
 
+	var isDirty = false
 	for _, hood := range hoods {
 		if doesAlreadyExist(hood.Name) {
 			log.Println("Neighborhood: ", hood.Name, " already exists")
@@ -1331,31 +1405,30 @@ func AddNeighborhoods(ctx context.Context, hoods []NeighborhoodInfo) (bool, erro
 		// 	return false, err
 		// }
 
-		sqlCmd := "insert into neighborhoods(name, zipcode, city, is_visible, dist_pt, last_modified_time) " +
-			"values ($1, $2, $3, $4, $5, $6::timestamp)"
+		hood.LastModifiedTime = lastModifiedTime
+		sqlFields, valIdxs, values := FrHoodType2Sql(hood)
+
+		sqlCmd := fmt.Sprintf("insert into neighborhoods(%s) values (%s)",
+			strings.Join(sqlFields, ","), strings.Join(valIdxs, ","))
+
 		log.Println("Adding neighborhood SqlCmd: ", sqlCmd)
-		_, err = trxn.Exec(context.Background(),
-			sqlCmd,
-			hood.Name,
-			hood.Zipcode,
-			hood.City,
-			hood.IsVisible,
-			hood.DistributionPoint,
-			lastModifiedTime)
+		_, err = trxn.Exec(context.Background(), sqlCmd, values...)
 		if err != nil {
 			trxn.Rollback(context.Background())
 			return false, err
 		}
 		existingHoods = append(existingHoods, hood)
+		isDirty = true
 	}
 
 	// Even though neighborhoods aren't a part of the fundariser config table we still treat it like it is so
 	// trigger time update to force re-download of config data.
-	sqlCmd2 := "UPDATE fundraiser_config SET last_modified_time=$1::timestamp WHERE last_modified_time=(SELECT last_modified_time FROM fundraiser_config LIMIT 1)"
-	_, err = trxn.Exec(context.Background(), sqlCmd2, lastModifiedTime)
-	if err != nil {
-		trxn.Rollback(context.Background())
-		return false, err
+
+	if isDirty {
+		if err := updateFundraiserConfigWithTrxn(ctx, &trxn, FrConfigType{}); err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
 	}
 
 	log.Println("About to make a commitment")
@@ -1478,7 +1551,7 @@ func SetMulchTimecards(ctx context.Context, timecards []MulchTimecardType) (bool
 	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
 	log.Println("Setting Timecards at: ", lastModifiedTime)
 
-	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
 		return false, err
 	}
 
@@ -1604,7 +1677,7 @@ func AddUsers(ctx context.Context, users []UserInfo) (bool, error) {
 	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
 	log.Println("Setting Users at: ", lastModifiedTime)
 
-	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
 		return false, err
 	}
 
@@ -1876,7 +1949,7 @@ func AllocItemType2Sql(item AllocationItemType) ([]string, []string, []interface
 func SetFrCloseoutAllocations(ctx context.Context, allocations []AllocationItemType) (bool, error) {
 	log.Println("Setting Fr Closeout Allocations: ", allocations)
 
-	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
 		return false, err
 	}
 
@@ -1921,14 +1994,13 @@ func SetFrCloseoutAllocations(ctx context.Context, allocations []AllocationItemT
 ////////////////////////////////////////////////////////////////////////////
 //
 func ResetFundraisingData(ctx context.Context, doResetUsers bool, doResetOrders bool) (bool, error) {
-	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
 	log.Println("Setting Fr Data: users: %t  doResetOrders: %t", doResetUsers, doResetOrders)
 
 	if !(doResetUsers || doResetOrders) {
 		// Was told not to reset anything
 		return true, nil
 	}
-	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
 		return false, err
 	}
 
@@ -1953,12 +2025,12 @@ func ResetFundraisingData(ctx context.Context, doResetUsers bool, doResetOrders 
 			trxn.Rollback(context.Background())
 			return false, err
 		}
+		frConfig := FrConfigType{FinalizationData: &FinalizationDataType{}, MulchDeliveryConfigs: &[]MulchDeliveryConfigType{}}
 
-		// Always do timestamp
-		sqlFields = append(sqlFields, "last_modified_time")
-		values = append(values, frConfig.LastModifiedTime)
-		valIdxs = append(valIdxs, fmt.Sprintf("$%d::timestamp", valIdx))
-		return sqlFields, valIdxs, values
+		if err := updateFundraiserConfigWithTrxn(ctx, &trxn, frConfig); err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
 	}
 
 	log.Println("About to make a commitment")
