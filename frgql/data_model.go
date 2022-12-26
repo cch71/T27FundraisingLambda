@@ -1736,9 +1736,7 @@ func AddUsers(ctx context.Context, users []UserInfo) (bool, error) {
 
 	// Even though users aren't a part of the fundariser config table we still treat it like it is so
 	// trigger time update to force re-download of config data.
-	sqlCmd2 := "UPDATE fundraiser_config SET last_modified_time=$1::timestamp WHERE last_modified_time=(SELECT last_modified_time FROM fundraiser_config LIMIT 1)"
-	_, err = trxn.Exec(context.Background(), sqlCmd2, lastModifiedTime)
-	if err != nil {
+	if err := updateFundraiserConfigWithTrxn(ctx, &trxn, FrConfigType{}); err != nil {
 		trxn.Rollback(context.Background())
 		return false, err
 	}
@@ -1991,6 +1989,35 @@ func SetFrCloseoutAllocations(ctx context.Context, allocations []AllocationItemT
 	return true, nil
 }
 
+const DROP_ORDER_TABLE_SQL = "drop table allocation_summary, mulch_delivery_timecards, mulch_orders, mulch_spreaders"
+const MULCH_ORDERS_TABLE_SQL = "CREATE TABLE mulch_orders (order_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), order_owner_id STRING, cash_amount_collected DECIMAL(13, 4), check_amount_collected DECIMAL(13, 4), check_numbers STRING, amount_from_donations DECIMAL(13, 4), amount_from_purchases DECIMAL(13, 4), will_collect_money_later BOOL, total_amount_collected DECIMAL(13,4), special_instructions STRING, is_verified BOOL, last_modified_time TIMESTAMP, purchases JSONB, delivery_id INT, customer_addr1 STRING, customer_addr2 STRING, customer_neighborhood STRING, known_addr_id UUID, customer_email STRING, customer_phone STRING, customer_name STRING)"
+const MULCH_SPREADERS_TABLE_SQL = "CREATE TABLE mulch_spreaders (order_id UUID PRIMARY KEY, spreaders JSONB)"
+const MULCH_DELIVERY_TIMECARD_TABLE_SQL = "CREATE TABLE mulch_delivery_timecards (uid STRING, delivery_id INT, last_modified_time TIMESTAMP, time_in TIME, time_out TIME, time_total TIME, PRIMARY KEY (uid, delivery_id, time_in))"
+const ALLOCATION_SUMMARY_TABLE_SQL = "CREATE TABLE allocation_summary (uid STRING PRIMARY KEY, bags_sold INT, bags_spread DECIMAL(13,4), delivery_minutes DECIMAL(13,4), total_donations DECIMAL(13,4), allocation_from_bags_sold DECIMAL(13,4), allocation_from_bags_spread DECIMAL(13,4), allocation_from_delivery DECIMAL(13,4), allocation_total DECIMAL(13,4))"
+
+const DROP_USERS_TABLE_SQL = "drop table users"
+const USERS_TABLE_SQL = "CREATE TABLE users (id STRING, group_id STRING, name STRING, created_time TIMESTAMP, last_modified_time TIMESTAMP, has_auth_creds BOOL)"
+
+////////////////////////////////////////////////////////////////////////////
+//
+func resetOrderTables(ctx context.Context, trxn *pgx.Tx) error {
+	resetSqlCmds := [...]string{
+		DROP_ORDER_TABLE_SQL,
+		MULCH_ORDERS_TABLE_SQL,
+		MULCH_SPREADERS_TABLE_SQL,
+		MULCH_DELIVERY_TIMECARD_TABLE_SQL,
+		ALLOCATION_SUMMARY_TABLE_SQL,
+	}
+
+	for _, sqlCmd := range resetSqlCmds {
+		if _, err := (*trxn).Exec(context.Background(), sqlCmd); err != nil {
+			return err
+		}
+	}
+	return nil
+
+}
+
 ////////////////////////////////////////////////////////////////////////////
 //
 func ResetFundraisingData(ctx context.Context, doResetUsers bool, doResetOrders bool) (bool, error) {
@@ -2010,8 +2037,13 @@ func ResetFundraisingData(ctx context.Context, doResetUsers bool, doResetOrders 
 	}
 
 	if doResetUsers {
-		log.Println("Deleting users data ")
-		_, err = trxn.Exec(context.Background(), "drop table users")
+		log.Println("Resetting users data ")
+		_, err = trxn.Exec(context.Background(), DROP_USERS_TABLE_SQL)
+		if err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
+		_, err = trxn.Exec(context.Background(), USERS_TABLE_SQL)
 		if err != nil {
 			trxn.Rollback(context.Background())
 			return false, err
@@ -2019,14 +2051,14 @@ func ResetFundraisingData(ctx context.Context, doResetUsers bool, doResetOrders 
 	}
 
 	if doResetOrders {
-		log.Println("Deleting orders data")
-		_, err = trxn.Exec(context.Background(), "drop table allocation_summary, mulch_delivery_timecards, mulch_orders, mulch_spreaders")
+		log.Println("Resetting orders data")
+		err = resetOrderTables(ctx, &trxn)
 		if err != nil {
 			trxn.Rollback(context.Background())
 			return false, err
 		}
-		frConfig := FrConfigType{FinalizationData: &FinalizationDataType{}, MulchDeliveryConfigs: &[]MulchDeliveryConfigType{}}
 
+		frConfig := FrConfigType{FinalizationData: &FinalizationDataType{}, MulchDeliveryConfigs: &[]MulchDeliveryConfigType{}}
 		if err := updateFundraiserConfigWithTrxn(ctx, &trxn, frConfig); err != nil {
 			trxn.Rollback(context.Background())
 			return false, err

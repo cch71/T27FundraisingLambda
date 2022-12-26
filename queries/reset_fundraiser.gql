@@ -1,0 +1,4 @@
+
+mutation {
+  resetFundraisingData(doResetUsers: true, doResetOrders: true)
+}
