@@ -9,6 +9,7 @@ require (
 )
 
 require (
+	github.com/codingsince1985/geo-golang v1.8.3 // indirect
 	github.com/go-resty/resty/v2 v2.7.0 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.4.2 // indirect

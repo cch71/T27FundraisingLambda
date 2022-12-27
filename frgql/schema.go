@@ -930,6 +930,43 @@ func init() {
 		},
 	}
 
+	//////////////////////////////////////////////////////////////////////////////
+	// Geolocation Address Type
+	addressType := graphql.NewObject(graphql.ObjectConfig{
+		Name:        "AddressType",
+		Description: "Address Information",
+		Fields: graphql.Fields{
+			"zipcode":     &graphql.Field{Type: graphql.Int},
+			"city":        &graphql.Field{Type: graphql.String},
+			"houseNumber": &graphql.Field{Type: graphql.String},
+			"street":      &graphql.Field{Type: graphql.String},
+		},
+	})
+	queryFields["getAddress"] = &graphql.Field{
+		Type:        addressType,
+		Description: "Retrieves Address from geo information",
+		Args: graphql.FieldConfigArgument{
+			"lat": &graphql.ArgumentConfig{
+				Description: "Latitude",
+				Type:        graphql.NewNonNull(graphql.Float),
+			},
+			"lng": &graphql.ArgumentConfig{
+				Description: "Longitude",
+				Type:        graphql.NewNonNull(graphql.Float),
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			var lat, lng float64
+			if val, ok := p.Args["lat"]; ok {
+				lat = val.(float64)
+			}
+			if val, ok := p.Args["lng"]; ok {
+				lng = val.(float64)
+			}
+			return GetAddrFromLatLng(p.Context, lat, lng)
+		},
+	}
+
 	// queryFields["testApi"] = &graphql.Field{
 	// 	Type:        graphql.Boolean,
 	// 	Description: "",

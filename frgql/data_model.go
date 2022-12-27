@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,18 +21,34 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/shopspring/decimal"
+
+	"github.com/codingsince1985/geo-golang"
+	"github.com/codingsince1985/geo-golang/openstreetmap"
 )
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 var (
-	dbMutex sync.Mutex
-	Db      *pgxpool.Pool
+	dbMutex  sync.Mutex
+	Db       *pgxpool.Pool
+	GEOCODER = get_geocoder()
 	//mulchOrderFields bimap.BiMap
 )
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////
+//
+func get_geocoder() geo.Geocoder {
+	geocoder := openstreetmap.Geocoder()
+	// geocoder := chained.Geocoder(
+	// 	openstreetmap.Geocoder(),
+	// 	mapbox.Geocoder(os.Getenv("MAPBOX_API_KEY")),
+	// )
+
+	return geocoder
+}
 
 ////////////////////////////////////////////////////////////////////////////
 //
@@ -2093,6 +2110,45 @@ func ResetFundraisingData(ctx context.Context, doResetUsers bool, doResetOrders 
 		return false, err
 	}
 	return true, nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+type GeocodedAddress struct {
+	HouseNumber string `json: houseNumber`
+	Street      string `json: street`
+	Zipcode     int    `json: zipcode`
+	City        string `json: city`
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func GetAddrFromLatLng(ctx context.Context, lat float64, lng float64) (*GeocodedAddress, error) {
+	log.Println("Reverse Geocoding lat/lng: (%.6f, %.6f)", lat, lng)
+	resolvedAddress, err := GEOCODER.ReverseGeocode(lat, lng)
+	if err != nil {
+		return nil, err
+	}
+	if resolvedAddress != nil {
+		log.Printf("Detailed address: %#v", resolvedAddress)
+		retVal := GeocodedAddress{
+			HouseNumber: resolvedAddress.HouseNumber,
+			Street:      resolvedAddress.Street,
+			City:        resolvedAddress.City,
+		}
+		zipcode, err := strconv.Atoi(resolvedAddress.Postcode)
+		if err != nil {
+			log.Printf("Failed to convert postcode: %s", resolvedAddress.Postcode)
+		} else {
+			retVal.Zipcode = zipcode
+		}
+
+		log.Printf("Address of (%.6f,%.6f) is %s", lat, lng, retVal)
+		return &retVal, nil
+	} else {
+		log.Println("got <nil> address")
+	}
+	return nil, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////

@@ -27,7 +27,7 @@ mutation {
          distributionPoint: "Walsh"
       },{
          name: "Brushy Creek (Cedar Park)",
-         city: "Austin",
+         city: "Cedar Park",
          zipcode: 78613,
          isVisible: true,
          distributionPoint: "Walsh"

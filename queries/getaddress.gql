@@ -1,0 +1,8 @@
+{
+  getAddress(lat: 30.0829014, lng: -97.2891028) {
+    zipcode
+    city
+    houseNumber
+    street
+  }
+}
