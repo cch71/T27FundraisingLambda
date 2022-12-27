@@ -58,6 +58,8 @@ func init() {
 		Fields: graphql.Fields{
 			"addr1":        &graphql.Field{Type: graphql.String},
 			"addr2":        &graphql.Field{Type: graphql.String},
+			"city":         &graphql.Field{Type: graphql.String},
+			"zipcode":      &graphql.Field{Type: graphql.Int},
 			"phone":        &graphql.Field{Type: graphql.String},
 			"email":        &graphql.Field{Type: graphql.String},
 			"neighborhood": &graphql.Field{Type: graphql.String},
@@ -126,6 +128,8 @@ func init() {
 		Fields: graphql.InputObjectConfigFieldMap{
 			"addr1":        &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"addr2":        &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"city":         &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"zipcode":      &graphql.InputObjectFieldConfig{Type: graphql.Int},
 			"phone":        &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"email":        &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"neighborhood": &graphql.InputObjectFieldConfig{Type: graphql.String},

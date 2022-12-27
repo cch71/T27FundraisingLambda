@@ -492,6 +492,8 @@ type CustomerType struct {
 	Name         string
 	Addr1        string
 	Addr2        *string
+	City         *string
+	Zipcode      *int
 	Phone        string
 	Email        *string
 	Neighborhood string
@@ -602,6 +604,10 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 			sqlFields = append(sqlFields, "customer_addr1")
 			inputs = append(inputs, &orderOutput.Customer.Addr2)
 			sqlFields = append(sqlFields, "customer_addr2")
+			inputs = append(inputs, &orderOutput.Customer.City)
+			sqlFields = append(sqlFields, "customer_city")
+			inputs = append(inputs, &orderOutput.Customer.Zipcode)
+			sqlFields = append(sqlFields, "customer_zipcode")
 			inputs = append(inputs, &orderOutput.Customer.Phone)
 			sqlFields = append(sqlFields, "customer_phone")
 			inputs = append(inputs, &orderOutput.Customer.Email)
@@ -813,6 +819,18 @@ func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 		sqlFields = append(sqlFields, "customer_addr2")
 		values = append(values, *order.Customer.Addr2)
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+	if nil != order.Customer.City {
+		sqlFields = append(sqlFields, "customer_city")
+		values = append(values, *order.Customer.City)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+	if nil != order.Customer.Zipcode {
+		sqlFields = append(sqlFields, "customer_zipcode")
+		values = append(values, *order.Customer.Zipcode)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::int", valIdx))
 		valIdx++
 	}
 	if len(order.Customer.Phone) != 0 {
@@ -2029,7 +2047,7 @@ func SetFrCloseoutAllocations(ctx context.Context, allocations []AllocationItemT
 }
 
 const DROP_ORDER_TABLE_SQL = "drop table allocation_summary, mulch_delivery_timecards, mulch_orders, mulch_spreaders"
-const MULCH_ORDERS_TABLE_SQL = "CREATE TABLE mulch_orders (order_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), order_owner_id STRING, cash_amount_collected DECIMAL(13, 4), check_amount_collected DECIMAL(13, 4), check_numbers STRING, amount_from_donations DECIMAL(13, 4), amount_from_purchases DECIMAL(13, 4), will_collect_money_later BOOL, total_amount_collected DECIMAL(13,4), special_instructions STRING, is_verified BOOL, last_modified_time TIMESTAMP, purchases JSONB, delivery_id INT, customer_addr1 STRING, customer_addr2 STRING, customer_neighborhood STRING, known_addr_id UUID, customer_email STRING, customer_phone STRING, customer_name STRING)"
+const MULCH_ORDERS_TABLE_SQL = "CREATE TABLE mulch_orders (order_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), order_owner_id STRING, cash_amount_collected DECIMAL(13, 4), check_amount_collected DECIMAL(13, 4), check_numbers STRING, amount_from_donations DECIMAL(13, 4), amount_from_purchases DECIMAL(13, 4), will_collect_money_later BOOL, total_amount_collected DECIMAL(13,4), special_instructions STRING, is_verified BOOL, last_modified_time TIMESTAMP, purchases JSONB, delivery_id INT, customer_addr1 STRING, customer_addr2 STRING, customer_zip INT, customer_city STRING, customer_neighborhood STRING, known_addr_id UUID, customer_email STRING, customer_phone STRING, customer_name STRING)"
 const MULCH_SPREADERS_TABLE_SQL = "CREATE TABLE mulch_spreaders (order_id UUID PRIMARY KEY, spreaders JSONB)"
 const MULCH_DELIVERY_TIMECARD_TABLE_SQL = "CREATE TABLE mulch_delivery_timecards (uid STRING, delivery_id INT, last_modified_time TIMESTAMP, time_in TIME, time_out TIME, time_total TIME, PRIMARY KEY (uid, delivery_id, time_in))"
 const ALLOCATION_SUMMARY_TABLE_SQL = "CREATE TABLE allocation_summary (uid STRING PRIMARY KEY, bags_sold INT, bags_spread DECIMAL(13,4), delivery_minutes DECIMAL(13,4), total_donations DECIMAL(13,4), allocation_from_bags_sold DECIMAL(13,4), allocation_from_bags_spread DECIMAL(13,4), allocation_from_delivery DECIMAL(13,4), allocation_total DECIMAL(13,4))"
