@@ -99,28 +99,6 @@ func init() {
 			"deliveryId":                &graphql.Field{Type: graphql.Int},
 		},
 	})
-	archivedMulchOrderType := graphql.NewObject(graphql.ObjectConfig{
-		Name:        "ArchivedMulchOrderType",
-		Description: "Archive Mulch Order Record Type",
-		Fields: graphql.Fields{
-			"orderId":                   &graphql.Field{Type: graphql.String},
-			"ownerId":                   &graphql.Field{Type: graphql.String},
-			"lastModifiedTime":          &graphql.Field{Type: graphql.String},
-			"specialInstructions":       &graphql.Field{Type: graphql.String},
-			"amountFromDonations":       &graphql.Field{Type: graphql.String},
-			"amountFromPurchases":       &graphql.Field{Type: graphql.String},
-			"amountFromCashCollected":   &graphql.Field{Type: graphql.String},
-			"amountFromChecksCollected": &graphql.Field{Type: graphql.String},
-			"amountTotalCollected":      &graphql.Field{Type: graphql.String},
-			"checkNumbers":              &graphql.Field{Type: graphql.String},
-			"willCollectMoneyLater":     &graphql.Field{Type: graphql.Boolean},
-			"isVerified":                &graphql.Field{Type: graphql.Boolean},
-			"customer":                  &graphql.Field{Type: customerType},
-			"purchases":                 &graphql.Field{Type: graphql.NewList(productType)},
-			"spreaders":                 &graphql.Field{Type: graphql.NewList(graphql.String)},
-			"yearOrdered":               &graphql.Field{Type: graphql.String},
-		},
-	})
 
 	customerInputType := graphql.NewInputObject(graphql.InputObjectConfig{
 		Name:        "CustomerInputType",
@@ -244,9 +222,8 @@ func init() {
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 			// if is_mulch_order getMulchOrder Else get etc...
 			params := GetMulchOrderParams{
-				OrderId:       p.Args["orderId"].(string),
-				GqlFields:     getSelectedFields([]string{"mulchOrder"}, p),
-				IsFromArchive: false,
+				OrderId:   p.Args["orderId"].(string),
+				GqlFields: getSelectedFields([]string{"mulchOrder"}, p),
 			}
 			return GetMulchOrder(params), nil
 		},
@@ -264,60 +241,10 @@ func init() {
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 			// if is_mulch_order getMulchOrder Else get etc...
 			params := GetMulchOrdersParams{
-				IsFromArchive: false,
-				GqlFields:     getSelectedFields([]string{"mulchOrders"}, p),
+				GqlFields: getSelectedFields([]string{"mulchOrders"}, p),
 			}
 			if val, ok := p.Args["ownerId"]; ok {
 				params.OwnerId = val.(string)
-			}
-			return GetMulchOrders(params), nil
-		},
-	}
-
-	queryFields["archivedMulchOrder"] = &graphql.Field{
-		Type:        archivedMulchOrderType,
-		Description: "Retrieves order associated with orderId",
-		Args: graphql.FieldConfigArgument{
-			"orderId": &graphql.ArgumentConfig{
-				Description: "The id of the order that should be returned",
-				Type:        graphql.NewNonNull(graphql.String),
-			},
-		},
-		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			// if is_mulch_order getMulchOrder Else get etc...
-			params := GetMulchOrderParams{
-				OrderId:       p.Args["orderId"].(string),
-				GqlFields:     getSelectedFields([]string{"archivedMulchOrder"}, p),
-				IsFromArchive: true,
-			}
-			return GetMulchOrder(params), nil
-		},
-	}
-
-	queryFields["archivedMulchOrders"] = &graphql.Field{
-		Type:        graphql.NewList(archivedMulchOrderType),
-		Description: "Retrieves order associated with ownerId",
-		Args: graphql.FieldConfigArgument{
-			"ownerId": &graphql.ArgumentConfig{
-				Description: "The owner id for which data should be returned.  If empty then all orders are returned",
-				Type:        graphql.String,
-			},
-			"archiveYear": &graphql.ArgumentConfig{
-				Description: "If specified then the year (YYYY) from the archive when the order was made",
-				Type:        graphql.String,
-			},
-		},
-		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			// if is_mulch_order getMulchOrder Else get etc...
-			params := GetMulchOrdersParams{
-				IsFromArchive: true,
-				GqlFields:     getSelectedFields([]string{"archivedMulchOrders"}, p),
-			}
-			if val, ok := p.Args["ownerId"]; ok {
-				params.OwnerId = val.(string)
-			}
-			if val, ok := p.Args["archiveYear"]; ok {
-				params.ArchiveYear = val.(string)
 			}
 			return GetMulchOrders(params), nil
 		},

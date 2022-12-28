@@ -525,17 +525,14 @@ type MulchOrderType struct {
 	Spreaders                 []string
 	Customer                  CustomerType
 	Purchases                 []ProductsType
-	DeliveryId                *int   // Not in archived GraphQL
-	YearOrdered               string // Not in non archived GraphQL
+	DeliveryId                *int // Not in archived GraphQL
 }
 
 ////////////////////////////////////////////////////////////////////////////
 //
 type GetMulchOrdersParams struct {
-	OwnerId       string
-	GqlFields     []string
-	IsFromArchive bool
-	ArchiveYear   string
+	OwnerId   string
+	GqlFields []string
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -557,9 +554,6 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 		case gqlField == "amountTotalCollected":
 			inputs = append(inputs, &orderOutput.AmountTotalCollected)
 			sqlFields = append(sqlFields, "total_amount_collected::string")
-		case gqlField == "yearOrdered":
-			inputs = append(inputs, &orderOutput.YearOrdered)
-			sqlFields = append(sqlFields, "year_ordered::string")
 		case gqlField == "purchases":
 			inputs = append(inputs, &orderOutput.Purchases)
 			sqlFields = append(sqlFields, "purchases::jsonb")
@@ -633,16 +627,12 @@ func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 	sqlFields, _, joinSql := mulchOrderGql2SqlMap(params.GqlFields, &order)
 
 	dbTable := "mulch_orders"
-	if params.IsFromArchive {
-		dbTable = "archived_mulch_orders"
-	}
 
 	if 0 == len(params.OwnerId) {
-		log.Println("Retrieving mulch orders. ", "Is targeting archive: ", params.IsFromArchive)
+		log.Println("Retrieving mulch orders.")
 
 	} else {
-		log.Println("Retrieving mulch orders. ", "Is targeting archive: ", params.IsFromArchive, " OwnerId: ", params.OwnerId)
-
+		log.Println("Retrieving mulch orders. OwnerId: ", params.OwnerId)
 	}
 
 	doQuery := func(id *string, dbTable *string, sqlFields []string) (pgx.Rows, error) {
@@ -686,23 +676,19 @@ func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 ////////////////////////////////////////////////////////////////////////////
 //
 type GetMulchOrderParams struct {
-	OrderId       string
-	GqlFields     []string
-	IsFromArchive bool
+	OrderId   string
+	GqlFields []string
 }
 
 ////////////////////////////////////////////////////////////////////////////
 //
 func GetMulchOrder(params GetMulchOrderParams) MulchOrderType {
-	log.Println("Retrieving mulch order. ", "Is targeting archive: ", params.IsFromArchive, " OrderId: ", params.OrderId)
+	log.Println("Retrieving mulch order. OrderId: ", params.OrderId)
 
 	order := MulchOrderType{}
 	sqlFields, inputs, joinSql := mulchOrderGql2SqlMap(params.GqlFields, &order)
 
 	dbTable := "mulch_orders"
-	if params.IsFromArchive {
-		dbTable = "archived_mulch_orders"
-	}
 	sqlCmd := fmt.Sprintf("select %s from %s %s where mulch_orders.order_id=$1", strings.Join(sqlFields, ","), dbTable, joinSql)
 	log.Println("SqlCmd: ", sqlCmd)
 	err := Db.QueryRow(context.Background(), sqlCmd, params.OrderId).Scan(inputs...)
