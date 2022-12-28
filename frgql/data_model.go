@@ -1338,12 +1338,14 @@ func GetNeighborhoods(gqlFields []string) ([]NeighborhoodInfo, error) {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func FrHoodType2Sql(hood NeighborhoodInfo) ([]string, []string, []interface{}) {
+func FrHoodType2Sql(hood NeighborhoodInfo, isUpdate bool) ([]string, []string, []interface{}) {
 	values := []interface{}{}
 	sqlFields := []string{}
 	valIdxs := []string{}
 	valIdx := 1
-	if len(hood.Name) != 0 {
+
+	// We don't use Name when we are updating
+	if !isUpdate && len(hood.Name) != 0 {
 		sqlFields = append(sqlFields, "name")
 		values = append(values, hood.Name)
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
@@ -1420,15 +1422,9 @@ func AddNeighborhoods(ctx context.Context, hoods []NeighborhoodInfo) (bool, erro
 		} else {
 			log.Println("Neighborhood: ", hood.Name, " does not exists")
 		}
-		// log.Println("Deleting existing record if it exists")
-		// _, err = trxn.Exec(context.Background(), "delete from users where id = $1", user.Id)
-		// if err != nil {
-		// 	trxn.Rollback(context.Background())
-		// 	return false, err
-		// }
 
 		hood.LastModifiedTime = lastModifiedTime
-		sqlFields, valIdxs, values := FrHoodType2Sql(hood)
+		sqlFields, valIdxs, values := FrHoodType2Sql(hood, false)
 
 		sqlCmd := fmt.Sprintf("insert into neighborhoods(%s) values (%s)",
 			strings.Join(sqlFields, ","), strings.Join(valIdxs, ","))
@@ -1440,6 +1436,67 @@ func AddNeighborhoods(ctx context.Context, hoods []NeighborhoodInfo) (bool, erro
 			return false, err
 		}
 		existingHoods = append(existingHoods, hood)
+		isDirty = true
+	}
+
+	// Even though neighborhoods aren't a part of the fundariser config table we still treat it like it is so
+	// trigger time update to force re-download of config data.
+
+	if isDirty {
+		if err := updateFundraiserConfigWithTrxn(ctx, &trxn, FrConfigType{}); err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
+	}
+
+	log.Println("About to make a commitment")
+	err = trxn.Commit(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func UpdateNeighborhoods(ctx context.Context, hoods []NeighborhoodInfo) (bool, error) {
+	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
+	log.Println("Updating Neighborhoods at: ", lastModifiedTime)
+
+	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
+	// Start Database Operations
+	trxn, err := Db.Begin(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	var isDirty = false
+	for _, hood := range hoods {
+
+		hood.LastModifiedTime = lastModifiedTime
+		sqlFields, valIdxs, values := FrHoodType2Sql(hood, true)
+
+		updateSqlFlds := []string{}
+		for i, f := range sqlFields {
+			updateSqlFlds = append(updateSqlFlds, fmt.Sprintf("%s=%s", f, valIdxs[i]))
+		}
+
+		sqlCmd := fmt.Sprintf(
+			"UPDATE neighborhoods SET %s WHERE name = '%s'",
+			strings.Join(updateSqlFlds, ","),
+			hood.Name,
+		)
+
+		log.Println("Updating neighborhood SqlCmd: ", sqlCmd)
+		_, err = trxn.Exec(context.Background(), sqlCmd, values...)
+		if err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
 		isDirty = true
 	}
 
