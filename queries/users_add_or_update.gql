@@ -1,0 +1,15 @@
+
+mutation {
+  addOrUpdateUsers(users: [{
+    id: "fruser1"
+    group: "Eagle"
+    firstName: "User"
+    lastName: "One"
+  },{
+    id: "fruser2"
+    group: "Owl"
+    firstName: "User"
+    lastName: "Two"
+    hasAuthCreds: true
+  }])
+}

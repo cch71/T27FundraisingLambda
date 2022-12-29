@@ -1673,12 +1673,14 @@ func SetMulchTimecards(ctx context.Context, timecards []MulchTimecardType) (bool
 ////////////////////////////////////////////////////////////////////////////
 //
 type UserInfo struct {
-	FirstName    string `json:"firstName"`
-	LastName     string `json:"lastName"`
-	Name         string `json:"name"`
-	Id           string `json:"id"`
-	Group        string `json:"group"`
-	HasAuthCreds bool   `json:"hasAuthCreds,omitempty"`
+	FirstName        string `json:"firstName"`
+	LastName         string `json:"lastName"`
+	Name             string `json:"name"`
+	Id               string `json:"id"`
+	Group            string `json:"group"`
+	HasAuthCreds     *bool  `json:"hasAuthCreds,omitempty"`
+	LastModifiedTime string `json:"lastModifiedTime,omitempty"`
+	CreatedTime      string `json:"createdTime,omitempty"`
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -1736,20 +1738,20 @@ func GetUsers(gqlFields []string) ([]UserInfo, error) {
 	for rows.Next() {
 		user := UserInfo{}
 		inputs := []interface{}{}
-		for _, gqlField := range gqlFields {
+		for _, fld := range sqlFields {
 			switch {
-			case "firstName" == gqlField:
+			case "first_name" == fld:
 				inputs = append(inputs, &user.FirstName)
-			case "lastName" == gqlField:
+			case "last_name" == fld:
 				inputs = append(inputs, &user.LastName)
-			case "id" == gqlField:
+			case "id" == fld:
 				inputs = append(inputs, &user.Id)
-			case "group" == gqlField:
+			case "group_id" == fld:
 				inputs = append(inputs, &user.Group)
-			case "hasAuthCreds" == gqlField:
+			case "has_auth_creds" == fld:
 				inputs = append(inputs, &user.HasAuthCreds)
 			default:
-				return users, errors.New(fmt.Sprintf("Unknown fundraiser user field: %s", gqlField))
+				return users, errors.New(fmt.Sprintf("Unknown fundraiser user db field: %s", fld))
 			}
 
 		}
@@ -1773,7 +1775,73 @@ func GetUsers(gqlFields []string) ([]UserInfo, error) {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func AddUsers(ctx context.Context, users []UserInfo) (bool, error) {
+func FrUsers2Sql(user UserInfo, isUpdate bool) ([]string, []string, []interface{}) {
+	values := []interface{}{}
+	sqlFields := []string{}
+	valIdxs := []string{}
+	valIdx := 1
+
+	if !isUpdate {
+		// These are fields we don't change when updating
+
+		if len(user.Id) != 0 {
+			sqlFields = append(sqlFields, "id")
+			values = append(values, user.Id)
+			valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+			valIdx++
+		}
+
+		if len(user.FirstName) != 0 {
+			sqlFields = append(sqlFields, "first_name")
+			values = append(values, user.FirstName)
+			valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+			valIdx++
+		}
+
+		if len(user.LastName) != 0 {
+			sqlFields = append(sqlFields, "last_name")
+			values = append(values, user.LastName)
+			valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+			valIdx++
+		}
+
+		// If we aren't updating then we are creating and so we always set these
+		sqlFields = append(sqlFields, "has_auth_creds")
+		values = append(values, false)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::bool", valIdx))
+		valIdx++
+
+		sqlFields = append(sqlFields, "created_time")
+		values = append(values, user.CreatedTime)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::timestamp", valIdx))
+		valIdx++
+	} else {
+		if nil != user.HasAuthCreds {
+			// Unfortunately hard to detect if this is set or not
+			sqlFields = append(sqlFields, "has_auth_creds")
+			values = append(values, *user.HasAuthCreds)
+			valIdxs = append(valIdxs, fmt.Sprintf("$%d::bool", valIdx))
+			valIdx++
+		}
+	}
+
+	if len(user.Group) != 0 {
+		sqlFields = append(sqlFields, "group_id")
+		values = append(values, user.Group)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+
+	// Always do timestamp
+	sqlFields = append(sqlFields, "last_modified_time")
+	values = append(values, user.LastModifiedTime)
+	valIdxs = append(valIdxs, fmt.Sprintf("$%d::timestamp", valIdx))
+	return sqlFields, valIdxs, values
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func AddOrUpdateUsers(ctx context.Context, users []UserInfo) (bool, error) {
 	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
 	log.Println("Setting Users at: ", lastModifiedTime)
 
@@ -1801,44 +1869,57 @@ func AddUsers(ctx context.Context, users []UserInfo) (bool, error) {
 		return false, err
 	}
 
+	var isDirty = false
 	for _, user := range users {
+		user.LastModifiedTime = lastModifiedTime
 		if doesAlreadyExist(user.Id) {
-			log.Println("User: ", user.Id, " already exists")
-			continue
+			log.Println("User: ", user.Id, " already exists so updating")
+
+			sqlFields, valIdxs, values := FrUsers2Sql(user, true)
+
+			updateSqlFlds := []string{}
+			for i, f := range sqlFields {
+				updateSqlFlds = append(updateSqlFlds, fmt.Sprintf("%s=%s", f, valIdxs[i]))
+			}
+
+			sqlCmd := fmt.Sprintf(
+				"UPDATE users SET %s WHERE id = '%s'",
+				strings.Join(updateSqlFlds, ","),
+				user.Id,
+			)
+
+			log.Println("Updating user SqlCmd: ", sqlCmd)
+			_, err = trxn.Exec(context.Background(), sqlCmd, values...)
+			if err != nil {
+				trxn.Rollback(context.Background())
+				return false, err
+			}
 		} else {
 			log.Println("User: ", user.Id, " does not exists")
-		}
-		// log.Println("Deleting existing record if it exists")
-		// _, err = trxn.Exec(context.Background(), "delete from users where id = $1", user.Id)
-		// if err != nil {
-		// 	trxn.Rollback(context.Background())
-		// 	return false, err
-		// }
+			user.CreatedTime = lastModifiedTime
+			sqlFields, valIdxs, values := FrUsers2Sql(user, false)
 
-		sqlCmd := "insert into users(id, user.first_name, user.last_name, group_id, has_auth_creds, last_modified_time, created_time) " +
-			"values ($1, $2, $3, $4, $5::timestamp, $6::timestamp)"
-		log.Println("Adding user SqlCmd: ", sqlCmd)
-		_, err = trxn.Exec(context.Background(),
-			sqlCmd,
-			user.Id,
-			user.FirstName,
-			user.LastName,
-			user.Group,
-			false,
-			lastModifiedTime,
-			lastModifiedTime)
-		if err != nil {
+			sqlCmd := fmt.Sprintf("insert into users(%s) values (%s)",
+				strings.Join(sqlFields, ","), strings.Join(valIdxs, ","))
+
+			log.Println("Adding user SqlCmd: ", sqlCmd)
+			_, err = trxn.Exec(context.Background(), sqlCmd, values...)
+			if err != nil {
+				trxn.Rollback(context.Background())
+				return false, err
+			}
+		}
+		existingUsers = append(existingUsers, user)
+		isDirty = true
+	}
+
+	if isDirty {
+		// Even though users aren't a part of the fundariser config table we still treat it like it is so
+		// trigger time update to force re-download of config data.
+		if err := updateFundraiserConfigWithTrxn(ctx, &trxn, FrConfigType{}); err != nil {
 			trxn.Rollback(context.Background())
 			return false, err
 		}
-		existingUsers = append(existingUsers, user)
-	}
-
-	// Even though users aren't a part of the fundariser config table we still treat it like it is so
-	// trigger time update to force re-download of config data.
-	if err := updateFundraiserConfigWithTrxn(ctx, &trxn, FrConfigType{}); err != nil {
-		trxn.Rollback(context.Background())
-		return false, err
 	}
 
 	log.Println("About to make a commitment")

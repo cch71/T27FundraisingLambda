@@ -443,14 +443,15 @@ func init() {
 		Name:        "UserInfoInputType",
 		Description: "Fundraiser user",
 		Fields: graphql.InputObjectConfigFieldMap{
-			"firstName": &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"lastName":  &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"id":        &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"group":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"firstName":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"lastName":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"id":           &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"group":        &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"hasAuthCreds": &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
 		},
 	})
 
-	mutationFields["addUsers"] = &graphql.Field{
+	mutationFields["addOrUpdateUsers"] = &graphql.Field{
 		Type:        graphql.Boolean,
 		Description: "Add user(s) to system",
 		Args: graphql.FieldConfigArgument{
@@ -471,7 +472,7 @@ func init() {
 				log.Println("Error decoding JSON to userinfo")
 				return nil, nil
 			}
-			return AddUsers(p.Context, users)
+			return AddOrUpdateUsers(p.Context, users)
 		},
 	}
 
