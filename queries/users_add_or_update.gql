@@ -6,10 +6,9 @@ mutation {
     firstName: "User"
     lastName: "One"
   },{
-    id: "fruser2"
+    id: "fruser3"
     group: "Owl"
     firstName: "User"
-    lastName: "Two"
-    hasAuthCreds: true
+    lastName: "Three"
   }])
 }

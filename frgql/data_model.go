@@ -1870,6 +1870,7 @@ func AddOrUpdateUsers(ctx context.Context, users []UserInfo) (bool, error) {
 	}
 
 	var isDirty = false
+	var isAddingUsers = false
 	for _, user := range users {
 		user.LastModifiedTime = lastModifiedTime
 		if doesAlreadyExist(user.Id) {
@@ -1908,6 +1909,7 @@ func AddOrUpdateUsers(ctx context.Context, users []UserInfo) (bool, error) {
 				trxn.Rollback(context.Background())
 				return false, err
 			}
+			isAddingUsers = true
 		}
 		existingUsers = append(existingUsers, user)
 		isDirty = true
@@ -1926,6 +1928,14 @@ func AddOrUpdateUsers(ctx context.Context, users []UserInfo) (bool, error) {
 	err = trxn.Commit(context.Background())
 	if err != nil {
 		return false, err
+	}
+
+	if isAddingUsers {
+		CreateIssue(NewIssue{
+			Id:    "NEW_USER_REQ",
+			Title: "NEW_USER_REQ",
+			Body:  "New users have been added to the system",
+		})
 	}
 
 	return true, nil
