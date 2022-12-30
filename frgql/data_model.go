@@ -1689,9 +1689,9 @@ func SetMulchTimecards(ctx context.Context, timecards []MulchTimecardType) (bool
 type UserInfo struct {
 	FirstName        string `json:"firstName"`
 	LastName         string `json:"lastName"`
-	Name             string `json:"name"`
 	Id               string `json:"id"`
 	Group            string `json:"group"`
+	Name             string `json:"name,omitempty"`
 	HasAuthCreds     *bool  `json:"hasAuthCreds,omitempty"`
 	LastModifiedTime string `json:"lastModifiedTime,omitempty"`
 	CreatedTime      string `json:"createdTime,omitempty"`
@@ -1699,7 +1699,14 @@ type UserInfo struct {
 
 ////////////////////////////////////////////////////////////////////////////
 //
-func GetUsers(gqlFields []string) ([]UserInfo, error) {
+type GetUsersParams struct {
+	GqlFields                 []string
+	ShowUsersWithoutAuthCreds bool
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func GetUsers(params GetUsersParams) ([]UserInfo, error) {
 
 	log.Println("Retrieving Fundraiser Users")
 
@@ -1710,7 +1717,7 @@ func GetUsers(gqlFields []string) ([]UserInfo, error) {
 		sqlFields := []string{}
 		doWantFullNames := false
 		exists := struct{}{}
-		for _, gqlField := range gqlFields {
+		for _, gqlField := range params.GqlFields {
 			switch {
 			case "firstName" == gqlField:
 				sqlFieldSet["first_name"] = exists
@@ -1742,6 +1749,10 @@ func GetUsers(gqlFields []string) ([]UserInfo, error) {
 	}
 
 	sqlCmd := fmt.Sprintf("select %s from users", strings.Join(sqlFields, ","))
+	if params.ShowUsersWithoutAuthCreds {
+		sqlCmd = sqlCmd + " where not has_auth_creds"
+	}
+
 	rows, err := Db.Query(context.Background(), sqlCmd)
 	if err != nil {
 		log.Println("User query failed", err)
@@ -1863,7 +1874,7 @@ func AddOrUpdateUsers(ctx context.Context, users []UserInfo) (bool, error) {
 		return false, err
 	}
 
-	existingUsers, err := GetUsers([]string{"id"})
+	existingUsers, err := GetUsers(GetUsersParams{GqlFields: []string{"id"}})
 	if err != nil {
 		return false, err
 	}

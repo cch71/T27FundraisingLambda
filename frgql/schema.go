@@ -442,9 +442,21 @@ func init() {
 	queryFields["users"] = &graphql.Field{
 		Type:        graphql.NewList(userInfoType),
 		Description: "Queries for list of users",
+		Args: graphql.FieldConfigArgument{
+			"showOnlyUsersWithoutAuthCreds": &graphql.ArgumentConfig{
+				Description: "If true will filter list to only show users with hasAuthCreds==false",
+				Type:        graphql.Boolean,
+			},
+		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			gqlFields := getSelectedFields([]string{"users"}, p)
-			return GetUsers(gqlFields)
+			params := GetUsersParams{
+				GqlFields:                 getSelectedFields([]string{"users"}, p),
+				ShowUsersWithoutAuthCreds: false,
+			}
+			if val, ok := p.Args["showOnlyUsersWithoutAuthCreds"]; ok {
+				params.ShowUsersWithoutAuthCreds = val.(bool)
+			}
+			return GetUsers(params)
 		},
 	}
 
