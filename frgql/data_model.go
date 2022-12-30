@@ -532,8 +532,9 @@ type MulchOrderType struct {
 ////////////////////////////////////////////////////////////////////////////
 //
 type GetMulchOrdersParams struct {
-	OwnerId   string
-	GqlFields []string
+	OwnerId    string
+	SpreaderId string
+	GqlFields  []string
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -593,7 +594,7 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 			sqlFields = append(sqlFields, "is_verified")
 		case gqlField == "spreaders":
 			inputs = append(inputs, &orderOutput.Spreaders)
-			sqlFields = append(sqlFields, "spreaders::jsonb")
+			sqlFields = append(sqlFields, "spreaders")
 			joinSql = "LEFT JOIN mulch_spreaders ON mulch_orders.order_id = mulch_spreaders.order_id"
 		case gqlField == "customer":
 			inputs = append(inputs, &orderOutput.Customer.Name)
@@ -624,13 +625,12 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 //
 func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 
+	// select order_id  from mulch_spreaders where 'fruser2' = any(spreaders);
 	//select order_owner_id, spreaders from mulch_orders left join mulch_spreaders on mulch_orders.order_id = mulch_spreaders.order_id
 	//where mulch_orders.order_id = '2a166081-787f-4ff6-9477-31b21b6ca2f7';
 
 	order := MulchOrderType{}
 	sqlFields, _, joinSql := mulchOrderGql2SqlMap(params.GqlFields, &order)
-
-	dbTable := "mulch_orders"
 
 	if 0 == len(params.OwnerId) {
 		log.Println("Retrieving mulch orders.")
@@ -639,20 +639,24 @@ func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 		log.Println("Retrieving mulch orders. OwnerId: ", params.OwnerId)
 	}
 
-	doQuery := func(id *string, dbTable *string, sqlFields []string) (pgx.Rows, error) {
-		sqlCmd := fmt.Sprintf("select %s from %s %s", strings.Join(sqlFields, ","), *dbTable, joinSql)
-		if len(*id) == 0 {
-			log.Println("SqlCmd: ", sqlCmd)
-			return Db.Query(context.Background(), sqlCmd)
-		} else {
+	doQuery := func() (pgx.Rows, error) {
+		sqlCmd := fmt.Sprintf("select %s from mulch_orders %s", strings.Join(sqlFields, ","), joinSql)
+		if len(params.OwnerId) != 0 {
 			sqlCmd = sqlCmd + " where order_owner_id=$1"
 			log.Println("SqlCmd: ", sqlCmd)
-			return Db.Query(context.Background(), sqlCmd, *id)
+			return Db.Query(context.Background(), sqlCmd, params.OwnerId)
+		} else if len(params.SpreaderId) != 0 {
+			sqlCmd = sqlCmd + " where $1=any(spreaders)"
+			log.Println("SqlCmd: ", sqlCmd)
+			return Db.Query(context.Background(), sqlCmd, params.SpreaderId)
+		} else {
+			log.Println("SqlCmd: ", sqlCmd)
+			return Db.Query(context.Background(), sqlCmd)
 		}
 	}
 
 	orders := []MulchOrderType{}
-	rows, err := doQuery(&params.OwnerId, &dbTable, sqlFields)
+	rows, err := doQuery()
 	if err != nil {
 		log.Println("Mulch Orders query failed", err)
 		return orders
@@ -2043,7 +2047,7 @@ func SetSpreaders(orderId string, spreaders []string) (bool, error) {
 	}
 
 	if len(spreaders) > 0 {
-		sqlCmd := "insert into mulch_spreaders(order_id, spreaders) values ($1, $2::jsonb)"
+		sqlCmd := "insert into mulch_spreaders(order_id, spreaders) values ($1, $2)"
 		_, err = trxn.Exec(context.Background(), sqlCmd, orderId, spreaders)
 		if err != nil {
 			trxn.Rollback(context.Background())
@@ -2198,7 +2202,7 @@ CREATE TABLE mulch_orders (order_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), 
  purchases JSONB, delivery_id INT, customer_addr1 STRING, customer_addr2 STRING, customer_zipcode INT, customer_city STRING,
  customer_neighborhood STRING, known_addr_id UUID, customer_email STRING, customer_phone STRING, customer_name STRING, comments STRING)
 `
-const MULCH_SPREADERS_TABLE_SQL = "CREATE TABLE mulch_spreaders (order_id UUID PRIMARY KEY, spreaders JSONB)"
+const MULCH_SPREADERS_TABLE_SQL = "CREATE TABLE mulch_spreaders (order_id UUID PRIMARY KEY, spreaders STRING[])"
 const MULCH_DELIVERY_TIMECARD_TABLE_SQL = `CREATE TABLE mulch_delivery_timecards (uid STRING, delivery_id INT, last_modified_time ` +
 	`TIMESTAMP, time_in TIME, time_out TIME, time_total TIME, PRIMARY KEY (uid, delivery_id, time_in))`
 const ALLOCATION_SUMMARY_TABLE_SQL = `CREATE TABLE allocation_summary (uid STRING PRIMARY KEY, bags_sold INT, bags_spread DECIMAL(13,4), ` +

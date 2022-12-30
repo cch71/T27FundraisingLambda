@@ -236,7 +236,11 @@ func init() {
 		Description: "Retrieves order associated with ownerId",
 		Args: graphql.FieldConfigArgument{
 			"ownerId": &graphql.ArgumentConfig{
-				Description: "The owner id for which data should be returned.  If empty then all orders are returned",
+				Description: "The owner id for which data should be returned.  If both params empty then all orders are returned",
+				Type:        graphql.String,
+			},
+			"spreaderId": &graphql.ArgumentConfig{
+				Description: "The spreader id for which data should be returned.  If both params empty then all orders are returned",
 				Type:        graphql.String,
 			},
 		},
@@ -247,6 +251,9 @@ func init() {
 			}
 			if val, ok := p.Args["ownerId"]; ok {
 				params.OwnerId = val.(string)
+			}
+			if val, ok := p.Args["spreaderId"]; ok {
+				params.SpreaderId = val.(string)
 			}
 			return GetMulchOrders(params), nil
 		},
