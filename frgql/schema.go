@@ -84,6 +84,7 @@ func init() {
 			"orderId":                   &graphql.Field{Type: graphql.String},
 			"ownerId":                   &graphql.Field{Type: graphql.String},
 			"lastModifiedTime":          &graphql.Field{Type: graphql.String},
+			"comments":                  &graphql.Field{Type: graphql.String},
 			"specialInstructions":       &graphql.Field{Type: graphql.String},
 			"amountFromDonations":       &graphql.Field{Type: graphql.String},
 			"amountFromPurchases":       &graphql.Field{Type: graphql.String},
@@ -131,6 +132,7 @@ func init() {
 		Fields: graphql.InputObjectConfigFieldMap{
 			"orderId":                   &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"ownerId":                   &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"comments":                  &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"specialInstructions":       &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"amountFromDonations":       &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"amountFromPurchases":       &graphql.InputObjectFieldConfig{Type: graphql.String},
