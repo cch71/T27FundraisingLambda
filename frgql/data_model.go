@@ -1870,6 +1870,10 @@ func AddOrUpdateUsers(ctx context.Context, users []UserInfo) (bool, error) {
 	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
 	log.Println("Setting Users at: ", lastModifiedTime)
 
+	if len(users) == 0 {
+		return true, nil
+	}
+
 	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
 		return false, err
 	}
@@ -1897,6 +1901,9 @@ func AddOrUpdateUsers(ctx context.Context, users []UserInfo) (bool, error) {
 	var isDirty = false
 	var isAddingUsers = false
 	for _, user := range users {
+		if len(user.Id) == 0 {
+			continue
+		}
 		user.LastModifiedTime = lastModifiedTime
 		if doesAlreadyExist(user.Id) {
 			log.Println("User: ", user.Id, " already exists so updating")

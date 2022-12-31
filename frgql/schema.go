@@ -464,9 +464,9 @@ func init() {
 		Name:        "UserInfoInputType",
 		Description: "Fundraiser user",
 		Fields: graphql.InputObjectConfigFieldMap{
+			"id":           &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
 			"firstName":    &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"lastName":     &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"id":           &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"group":        &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"hasAuthCreds": &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
 		},
