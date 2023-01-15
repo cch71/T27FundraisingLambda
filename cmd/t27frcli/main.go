@@ -617,6 +617,9 @@ func main() {
 			log.Panic("in param required for gql request")
 		}
 		makeGqlReq(ctx, gqlCmdFilenameInPtr)
+	case "gentoken":
+		_, token := loginKcAdmin(ctx)
+		log.Printf("Bearer %s", token)
 	default:
 		flag.PrintDefaults()
 		log.Fatal("Invalid cli flag combination")
