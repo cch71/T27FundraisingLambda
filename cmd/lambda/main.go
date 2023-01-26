@@ -64,10 +64,14 @@ func HandleLambdaEvent(ctx context.Context, event LambdaRequest) (LambdaResponse
 		log.Println("Failed to initialize db:", err)
 		return generateResp("", http.StatusInternalServerError), err
 	}
-	log.Println("Rxed GraphQL Query: ", event)
+
 	if bearerToken, prs := event.Headers["Authorization"]; prs {
 		ctx = context.WithValue(ctx, "T27FrAuthorization", bearerToken[len("Bearer "):])
+		// We don't want this printing out in the log
+		delete(event.Headers, "Authorization")
 	}
+
+	log.Println("Rxed GraphQL Query: ", event)
 
 	body := LambdaRequestBody{}
 	json.Unmarshal([]byte(event.Body), &body)

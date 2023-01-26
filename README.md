@@ -24,5 +24,5 @@ CREATE TABLE users (id STRING, group_id STRING, first_name STRING, last_name STR
 CREATE TABLE allocation_summary (uid STRING PRIMARY KEY, bags_sold INT, bags_spread DECIMAL(13,4), delivery_minutes DECIMAL(13,4), total_donations DECIMAL(13,4), allocation_from_bags_sold DECIMAL(13,4), allocation_from_bags_spread DECIMAL(13,4), allocation_from_delivery DECIMAL(13,4), allocation_total DECIMAL(13,4));
 ```
 ```
-CREATE TABLE known_addrs (id UUID, addr STRING, zipcode INTEGER, city STRING, lat STRING, lng STRING, last_modified_time TIMESTAMP, PRIMARY KEY (addr, zipcode, city);
+CREATE TABLE known_addrs (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), addr STRING, zipcode INTEGER, city STRING, lat STRING, lng STRING, last_modified_time TIMESTAMP, created_time TIMESTAMP);
 ```

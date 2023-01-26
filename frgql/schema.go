@@ -374,9 +374,9 @@ func init() {
 		},
 	})
 
-	mutationFields["addNeighborhoods"] = &graphql.Field{
+	mutationFields["addOrUpdateNeighborhoods"] = &graphql.Field{
 		Type:        graphql.Boolean,
-		Description: "Add neighborhood(s) to system",
+		Description: "Add or Update Neighborhood(s) in system",
 		Args: graphql.FieldConfigArgument{
 			"neighborhoods": &graphql.ArgumentConfig{
 				Description: "List of neighborhoods",
@@ -395,32 +395,7 @@ func init() {
 				log.Println("Error decoding JSON to NeighborhoodInfo")
 				return nil, nil
 			}
-			return AddNeighborhoods(p.Context, hoods)
-		},
-	}
-
-	mutationFields["updateNeighborhoods"] = &graphql.Field{
-		Type:        graphql.Boolean,
-		Description: "Add neighborhood(s) to system",
-		Args: graphql.FieldConfigArgument{
-			"neighborhoods": &graphql.ArgumentConfig{
-				Description: "List of neighborhoods",
-				Type:        graphql.NewList(neighborhoodInputType),
-			},
-		},
-		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			// log.Println("Setting Config: ", p.Args["config"])
-			jsonString, err := json.Marshal(p.Args["neighborhoods"])
-			if err != nil {
-				log.Println("Error encoding JSON")
-				return nil, nil
-			}
-			hoods := []NeighborhoodInfo{}
-			if err := json.Unmarshal([]byte(jsonString), &hoods); err != nil {
-				log.Println("Error decoding JSON to NeighborhoodInfo")
-				return nil, nil
-			}
-			return UpdateNeighborhoods(p.Context, hoods)
+			return AddOrUpdateNeighborhoods(p.Context, hoods)
 		},
 	}
 

@@ -35,7 +35,7 @@ test:
 		go test ./... --cover
 
 deploy: dist
-		aws lambda update-function-code --function-name ${GQL_LAMBDA_FUNCTION_NAME} --zip-file fileb://${PWD}/dist/function.zip
+		op plugin run -- aws lambda update-function-code --function-name ${GQL_LAMBDA_FUNCTION_NAME} --zip-file fileb://${PWD}/dist/function.zip
 
 # oldlambda: clean
 # 		 @for dir in `ls handler`; do \
