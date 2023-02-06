@@ -531,10 +531,106 @@ type MulchOrderType struct {
 
 ////////////////////////////////////////////////////////////////////////////
 //
+type MulchOrderMoneyCollectedType struct {
+	OwnerId                        string
+	AmountTotalCollected           *string
+	AmountTotalFromCashCollected   *string
+	AmountTotalFromChecksCollected *string
+	DeliveryId                     *int
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
 type GetMulchOrdersParams struct {
 	OwnerId    string
 	SpreaderId string
 	GqlFields  []string
+}
+
+////////////////////////////////////////////////////////////////////////////
+//
+func GetMulchOrdersMoneyCollected(params GetMulchOrdersParams) []MulchOrderMoneyCollectedType {
+
+	////////////////////////////////////////////////////////////////////////////
+	//
+	gql2sql := func(orderOutput *MulchOrderMoneyCollectedType) ([]string, []interface{}, string) {
+
+		sqlFields := []string{}
+		inputs := []interface{}{}
+		joinSql := ""
+		for _, gqlField := range params.GqlFields {
+			// log.Println(gqlField)
+			switch {
+			case gqlField == "ownerId":
+				inputs = append(inputs, &orderOutput.OwnerId)
+				sqlFields = append(sqlFields, "order_owner_id")
+			case gqlField == "deliveryId":
+				inputs = append(inputs, &orderOutput.DeliveryId)
+				sqlFields = append(sqlFields, "delivery_id")
+			case gqlField == "amountTotalCollected":
+				inputs = append(inputs, &orderOutput.AmountTotalCollected)
+				sqlFields = append(sqlFields, "SUM(total_amount_collected)::string")
+			case gqlField == "amountTotalFromCashCollected":
+				inputs = append(inputs, &orderOutput.AmountTotalFromCashCollected)
+				sqlFields = append(sqlFields, "SUM(cash_amount_collected)::string")
+			case gqlField == "amountTotalFromChecksCollected":
+				inputs = append(inputs, &orderOutput.AmountTotalFromChecksCollected)
+				sqlFields = append(sqlFields, "SUM(check_amount_collected)::string")
+			default:
+				log.Println("Do not know how to handle GraphQL Field: ", gqlField)
+			}
+
+		}
+		return sqlFields, inputs, joinSql
+	}
+
+	order := MulchOrderMoneyCollectedType{}
+	sqlFields, _, joinSql := gql2sql(&order)
+
+	if 0 == len(params.OwnerId) {
+		log.Println("Retrieving mulch orders money collected.")
+
+	} else {
+		log.Println("Retrieving mulch orders money collected. OwnerId: ", params.OwnerId)
+	}
+
+	doQuery := func() (pgx.Rows, error) {
+		sqlCmd := fmt.Sprintf("select %s from mulch_orders %s", strings.Join(sqlFields, ","), joinSql)
+		if len(params.OwnerId) != 0 {
+			sqlCmd = sqlCmd + " where order_owner_id=$1 group by order_owner_id, delivery_id"
+			log.Println("SqlCmd: ", sqlCmd)
+			return Db.Query(context.Background(), sqlCmd, params.OwnerId)
+		} else {
+			sqlCmd = sqlCmd + " group by order_owner_id, delivery_id"
+			log.Println("SqlCmd: ", sqlCmd)
+			return Db.Query(context.Background(), sqlCmd)
+		}
+	}
+
+	orders := []MulchOrderMoneyCollectedType{}
+	rows, err := doQuery()
+	if err != nil {
+		log.Println("Mulch Orders query failed", err)
+		return orders
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		order := MulchOrderMoneyCollectedType{}
+		_, inputs, _ := gql2sql(&order)
+		err = rows.Scan(inputs...)
+		if err != nil {
+			log.Println("Reading mulch order money collection row failed: ", err)
+			continue
+		}
+		orders = append(orders, order)
+	}
+
+	if rows.Err() != nil {
+		log.Println("Reading mulch order money collection rows had an issue: ", err)
+		return []MulchOrderMoneyCollectedType{}
+	}
+	return orders
 }
 
 ////////////////////////////////////////////////////////////////////////////

@@ -1,0 +1,9 @@
+{
+  mulchOrders(ownerId: "mletourneau") {
+    ownerId
+    deliveryId
+    amountTotalFromCashCollected
+    amountTotalFromChecksCollected
+    amountTotalCollected
+  }
+}

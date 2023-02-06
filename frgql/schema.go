@@ -81,23 +81,25 @@ func init() {
 		Name:        "MulchOrderType",
 		Description: "Mulch Order Record Type",
 		Fields: graphql.Fields{
-			"orderId":                   &graphql.Field{Type: graphql.String},
-			"ownerId":                   &graphql.Field{Type: graphql.String},
-			"lastModifiedTime":          &graphql.Field{Type: graphql.String},
-			"comments":                  &graphql.Field{Type: graphql.String},
-			"specialInstructions":       &graphql.Field{Type: graphql.String},
-			"amountFromDonations":       &graphql.Field{Type: graphql.String},
-			"amountFromPurchases":       &graphql.Field{Type: graphql.String},
-			"amountFromCashCollected":   &graphql.Field{Type: graphql.String},
-			"amountFromChecksCollected": &graphql.Field{Type: graphql.String},
-			"amountTotalCollected":      &graphql.Field{Type: graphql.String},
-			"checkNumbers":              &graphql.Field{Type: graphql.String},
-			"willCollectMoneyLater":     &graphql.Field{Type: graphql.Boolean},
-			"isVerified":                &graphql.Field{Type: graphql.Boolean},
-			"customer":                  &graphql.Field{Type: customerType},
-			"purchases":                 &graphql.Field{Type: graphql.NewList(productType)},
-			"spreaders":                 &graphql.Field{Type: graphql.NewList(graphql.String)},
-			"deliveryId":                &graphql.Field{Type: graphql.Int},
+			"orderId":                        &graphql.Field{Type: graphql.String},
+			"ownerId":                        &graphql.Field{Type: graphql.String},
+			"lastModifiedTime":               &graphql.Field{Type: graphql.String},
+			"comments":                       &graphql.Field{Type: graphql.String},
+			"specialInstructions":            &graphql.Field{Type: graphql.String},
+			"amountFromDonations":            &graphql.Field{Type: graphql.String},
+			"amountFromPurchases":            &graphql.Field{Type: graphql.String},
+			"amountFromCashCollected":        &graphql.Field{Type: graphql.String},
+			"amountFromChecksCollected":      &graphql.Field{Type: graphql.String},
+			"amountTotalFromCashCollected":   &graphql.Field{Type: graphql.String},
+			"amountTotalFromChecksCollected": &graphql.Field{Type: graphql.String},
+			"amountTotalCollected":           &graphql.Field{Type: graphql.String},
+			"checkNumbers":                   &graphql.Field{Type: graphql.String},
+			"willCollectMoneyLater":          &graphql.Field{Type: graphql.Boolean},
+			"isVerified":                     &graphql.Field{Type: graphql.Boolean},
+			"customer":                       &graphql.Field{Type: customerType},
+			"purchases":                      &graphql.Field{Type: graphql.NewList(productType)},
+			"spreaders":                      &graphql.Field{Type: graphql.NewList(graphql.String)},
+			"deliveryId":                     &graphql.Field{Type: graphql.Int},
 		},
 	})
 
@@ -255,7 +257,18 @@ func init() {
 			if val, ok := p.Args["spreaderId"]; ok {
 				params.SpreaderId = val.(string)
 			}
-			return GetMulchOrders(params), nil
+			isLookingForMoneyCollected := false
+			for _, v := range params.GqlFields {
+				if v == "amountTotalFromCashCollected" || v == "amountTotalFromChecksCollected" {
+					isLookingForMoneyCollected = true
+					break
+				}
+			}
+			if isLookingForMoneyCollected {
+				return GetMulchOrdersMoneyCollected(params), nil
+			} else {
+				return GetMulchOrders(params), nil
+			}
 		},
 	}
 
