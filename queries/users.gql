@@ -1,7 +1,9 @@
 {
-  users {
+  users(showOnlyUsersWithoutAuthCreds: true) {
     id
     group
-    name
+    firstName
+    lastName
+    hasAuthCreds
   }
 }

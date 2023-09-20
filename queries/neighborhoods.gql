@@ -1,0 +1,9 @@
+{
+  neighborhoods {
+    name
+    city
+    zipcode
+    isVisible
+    distributionPoint
+  }
+}

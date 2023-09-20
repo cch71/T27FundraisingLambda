@@ -5,6 +5,7 @@
     amountTotalCollected
     isVerified
     spreaders
+    comments
     customer {
         name
     }

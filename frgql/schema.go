@@ -14,7 +14,7 @@ var (
 	FrSchema graphql.Schema
 )
 
-////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////
 // Function for retrieving selected fields
 func getSelectedFields(selectionPath []string, resolveParams graphql.ResolveParams) []string {
 	fields := resolveParams.Info.FieldASTs
@@ -43,8 +43,7 @@ func getSelectedFields(selectionPath []string, resolveParams graphql.ResolvePara
 	return collect
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func init() {
 
 	queryFields := make(map[string]*graphql.Field)
@@ -58,6 +57,8 @@ func init() {
 		Fields: graphql.Fields{
 			"addr1":        &graphql.Field{Type: graphql.String},
 			"addr2":        &graphql.Field{Type: graphql.String},
+			"city":         &graphql.Field{Type: graphql.String},
+			"zipcode":      &graphql.Field{Type: graphql.Int},
 			"phone":        &graphql.Field{Type: graphql.String},
 			"email":        &graphql.Field{Type: graphql.String},
 			"neighborhood": &graphql.Field{Type: graphql.String},
@@ -79,44 +80,25 @@ func init() {
 		Name:        "MulchOrderType",
 		Description: "Mulch Order Record Type",
 		Fields: graphql.Fields{
-			"orderId":                   &graphql.Field{Type: graphql.String},
-			"ownerId":                   &graphql.Field{Type: graphql.String},
-			"lastModifiedTime":          &graphql.Field{Type: graphql.String},
-			"specialInstructions":       &graphql.Field{Type: graphql.String},
-			"amountFromDonations":       &graphql.Field{Type: graphql.String},
-			"amountFromPurchases":       &graphql.Field{Type: graphql.String},
-			"amountFromCashCollected":   &graphql.Field{Type: graphql.String},
-			"amountFromChecksCollected": &graphql.Field{Type: graphql.String},
-			"amountTotalCollected":      &graphql.Field{Type: graphql.String},
-			"checkNumbers":              &graphql.Field{Type: graphql.String},
-			"willCollectMoneyLater":     &graphql.Field{Type: graphql.Boolean},
-			"isVerified":                &graphql.Field{Type: graphql.Boolean},
-			"customer":                  &graphql.Field{Type: customerType},
-			"purchases":                 &graphql.Field{Type: graphql.NewList(productType)},
-			"spreaders":                 &graphql.Field{Type: graphql.NewList(graphql.String)},
-			"deliveryId":                &graphql.Field{Type: graphql.Int},
-		},
-	})
-	archivedMulchOrderType := graphql.NewObject(graphql.ObjectConfig{
-		Name:        "ArchivedMulchOrderType",
-		Description: "Archive Mulch Order Record Type",
-		Fields: graphql.Fields{
-			"orderId":                   &graphql.Field{Type: graphql.String},
-			"ownerId":                   &graphql.Field{Type: graphql.String},
-			"lastModifiedTime":          &graphql.Field{Type: graphql.String},
-			"specialInstructions":       &graphql.Field{Type: graphql.String},
-			"amountFromDonations":       &graphql.Field{Type: graphql.String},
-			"amountFromPurchases":       &graphql.Field{Type: graphql.String},
-			"amountFromCashCollected":   &graphql.Field{Type: graphql.String},
-			"amountFromChecksCollected": &graphql.Field{Type: graphql.String},
-			"amountTotalCollected":      &graphql.Field{Type: graphql.String},
-			"checkNumbers":              &graphql.Field{Type: graphql.String},
-			"willCollectMoneyLater":     &graphql.Field{Type: graphql.Boolean},
-			"isVerified":                &graphql.Field{Type: graphql.Boolean},
-			"customer":                  &graphql.Field{Type: customerType},
-			"purchases":                 &graphql.Field{Type: graphql.NewList(productType)},
-			"spreaders":                 &graphql.Field{Type: graphql.NewList(graphql.String)},
-			"yearOrdered":               &graphql.Field{Type: graphql.String},
+			"orderId":                        &graphql.Field{Type: graphql.String},
+			"ownerId":                        &graphql.Field{Type: graphql.String},
+			"lastModifiedTime":               &graphql.Field{Type: graphql.String},
+			"comments":                       &graphql.Field{Type: graphql.String},
+			"specialInstructions":            &graphql.Field{Type: graphql.String},
+			"amountFromDonations":            &graphql.Field{Type: graphql.String},
+			"amountFromPurchases":            &graphql.Field{Type: graphql.String},
+			"amountFromCashCollected":        &graphql.Field{Type: graphql.String},
+			"amountFromChecksCollected":      &graphql.Field{Type: graphql.String},
+			"amountTotalFromCashCollected":   &graphql.Field{Type: graphql.String},
+			"amountTotalFromChecksCollected": &graphql.Field{Type: graphql.String},
+			"amountTotalCollected":           &graphql.Field{Type: graphql.String},
+			"checkNumbers":                   &graphql.Field{Type: graphql.String},
+			"willCollectMoneyLater":          &graphql.Field{Type: graphql.Boolean},
+			"isVerified":                     &graphql.Field{Type: graphql.Boolean},
+			"customer":                       &graphql.Field{Type: customerType},
+			"purchases":                      &graphql.Field{Type: graphql.NewList(productType)},
+			"spreaders":                      &graphql.Field{Type: graphql.NewList(graphql.String)},
+			"deliveryId":                     &graphql.Field{Type: graphql.Int},
 		},
 	})
 
@@ -126,6 +108,8 @@ func init() {
 		Fields: graphql.InputObjectConfigFieldMap{
 			"addr1":        &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"addr2":        &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"city":         &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"zipcode":      &graphql.InputObjectFieldConfig{Type: graphql.Int},
 			"phone":        &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"email":        &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"neighborhood": &graphql.InputObjectFieldConfig{Type: graphql.String},
@@ -149,6 +133,7 @@ func init() {
 		Fields: graphql.InputObjectConfigFieldMap{
 			"orderId":                   &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"ownerId":                   &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"comments":                  &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"specialInstructions":       &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"amountFromDonations":       &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"amountFromPurchases":       &graphql.InputObjectFieldConfig{Type: graphql.String},
@@ -240,9 +225,8 @@ func init() {
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 			// if is_mulch_order getMulchOrder Else get etc...
 			params := GetMulchOrderParams{
-				OrderId:       p.Args["orderId"].(string),
-				GqlFields:     getSelectedFields([]string{"mulchOrder"}, p),
-				IsFromArchive: false,
+				OrderId:   p.Args["orderId"].(string),
+				GqlFields: getSelectedFields([]string{"mulchOrder"}, p),
 			}
 			return GetMulchOrder(params), nil
 		},
@@ -253,69 +237,37 @@ func init() {
 		Description: "Retrieves order associated with ownerId",
 		Args: graphql.FieldConfigArgument{
 			"ownerId": &graphql.ArgumentConfig{
-				Description: "The owner id for which data should be returned.  If empty then all orders are returned",
+				Description: "The owner id for which data should be returned.  If both params empty then all orders are returned",
+				Type:        graphql.String,
+			},
+			"spreaderId": &graphql.ArgumentConfig{
+				Description: "The spreader id for which data should be returned.  If both params empty then all orders are returned",
 				Type:        graphql.String,
 			},
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 			// if is_mulch_order getMulchOrder Else get etc...
 			params := GetMulchOrdersParams{
-				IsFromArchive: false,
-				GqlFields:     getSelectedFields([]string{"mulchOrders"}, p),
+				GqlFields: getSelectedFields([]string{"mulchOrders"}, p),
 			}
 			if val, ok := p.Args["ownerId"]; ok {
 				params.OwnerId = val.(string)
 			}
-			return GetMulchOrders(params), nil
-		},
-	}
-
-	queryFields["archivedMulchOrder"] = &graphql.Field{
-		Type:        archivedMulchOrderType,
-		Description: "Retrieves order associated with orderId",
-		Args: graphql.FieldConfigArgument{
-			"orderId": &graphql.ArgumentConfig{
-				Description: "The id of the order that should be returned",
-				Type:        graphql.NewNonNull(graphql.String),
-			},
-		},
-		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			// if is_mulch_order getMulchOrder Else get etc...
-			params := GetMulchOrderParams{
-				OrderId:       p.Args["orderId"].(string),
-				GqlFields:     getSelectedFields([]string{"archivedMulchOrder"}, p),
-				IsFromArchive: true,
+			if val, ok := p.Args["spreaderId"]; ok {
+				params.SpreaderId = val.(string)
 			}
-			return GetMulchOrder(params), nil
-		},
-	}
-
-	queryFields["archivedMulchOrders"] = &graphql.Field{
-		Type:        graphql.NewList(archivedMulchOrderType),
-		Description: "Retrieves order associated with ownerId",
-		Args: graphql.FieldConfigArgument{
-			"ownerId": &graphql.ArgumentConfig{
-				Description: "The owner id for which data should be returned.  If empty then all orders are returned",
-				Type:        graphql.String,
-			},
-			"archiveYear": &graphql.ArgumentConfig{
-				Description: "If specified then the year (YYYY) from the archive when the order was made",
-				Type:        graphql.String,
-			},
-		},
-		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			// if is_mulch_order getMulchOrder Else get etc...
-			params := GetMulchOrdersParams{
-				IsFromArchive: true,
-				GqlFields:     getSelectedFields([]string{"archivedMulchOrders"}, p),
+			isLookingForMoneyCollected := false
+			for _, v := range params.GqlFields {
+				if v == "amountTotalFromCashCollected" || v == "amountTotalFromChecksCollected" {
+					isLookingForMoneyCollected = true
+					break
+				}
 			}
-			if val, ok := p.Args["ownerId"]; ok {
-				params.OwnerId = val.(string)
+			if isLookingForMoneyCollected {
+				return GetMulchOrdersMoneyCollected(params), nil
+			} else {
+				return GetMulchOrders(params), nil
 			}
-			if val, ok := p.Args["archiveYear"]; ok {
-				params.ArchiveYear = val.(string)
-			}
-			return GetMulchOrders(params), nil
 		},
 	}
 
@@ -403,69 +355,134 @@ func init() {
 	}
 
 	//////////////////////////////////////////////////////////////////////////////
+	// Neighborhood Query/Input Types
+	neighborhoodInfoType := graphql.NewObject(graphql.ObjectConfig{
+		Name: "NeighborhoodConfigType",
+		Fields: graphql.Fields{
+			"name":              &graphql.Field{Type: graphql.String},
+			"zipcode":           &graphql.Field{Type: graphql.Int},
+			"city":              &graphql.Field{Type: graphql.String},
+			"isVisible":         &graphql.Field{Type: graphql.Boolean},
+			"distributionPoint": &graphql.Field{Type: graphql.String},
+		},
+	})
+	queryFields["neighborhoods"] = &graphql.Field{
+		Type:        graphql.NewList(neighborhoodInfoType),
+		Description: "Queries for list of neighborhoods",
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			gqlFields := getSelectedFields([]string{"neighborhoods"}, p)
+			return GetNeighborhoods(gqlFields)
+		},
+	}
+	neighborhoodInputType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name:        "NeighborhoodInfoInputType",
+		Description: "Fundraiser Neighborhood Input",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"name":              &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
+			"zipcode":           &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"city":              &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"isVisible":         &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
+			"distributionPoint": &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
+		},
+	})
+
+	mutationFields["addOrUpdateNeighborhoods"] = &graphql.Field{
+		Type:        graphql.Boolean,
+		Description: "Add or Update Neighborhood(s) in system",
+		Args: graphql.FieldConfigArgument{
+			"neighborhoods": &graphql.ArgumentConfig{
+				Description: "List of neighborhoods",
+				Type:        graphql.NewList(neighborhoodInputType),
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// log.Println("Setting Config: ", p.Args["config"])
+			jsonString, err := json.Marshal(p.Args["neighborhoods"])
+			if err != nil {
+				log.Println("Error encoding JSON")
+				return nil, nil
+			}
+			hoods := []NeighborhoodInfo{}
+			if err := json.Unmarshal([]byte(jsonString), &hoods); err != nil {
+				log.Println("Error decoding JSON to NeighborhoodInfo")
+				return nil, nil
+			}
+			return AddOrUpdateNeighborhoods(p.Context, hoods)
+		},
+	}
+
+	//////////////////////////////////////////////////////////////////////////////
 	// User/Group Query/Input Types
 	userInfoType := graphql.NewObject(graphql.ObjectConfig{
 		Name:        "UserInfoType",
 		Description: "User Info Type",
 		Fields: graphql.Fields{
-			"name":  &graphql.Field{Type: graphql.String},
-			"id":    &graphql.Field{Type: graphql.String},
-			"group": &graphql.Field{Type: graphql.String},
+			"firstName":    &graphql.Field{Type: graphql.String},
+			"lastName":     &graphql.Field{Type: graphql.String},
+			"name":         &graphql.Field{Type: graphql.String},
+			"id":           &graphql.Field{Type: graphql.String},
+			"group":        &graphql.Field{Type: graphql.String},
+			"hasAuthCreds": &graphql.Field{Type: graphql.Boolean},
 		},
 	})
+
 	queryFields["users"] = &graphql.Field{
 		Type:        graphql.NewList(userInfoType),
 		Description: "Queries for list of users",
+		Args: graphql.FieldConfigArgument{
+			"showOnlyUsersWithoutAuthCreds": &graphql.ArgumentConfig{
+				Description: "If true will filter list to only show users with hasAuthCreds==false",
+				Type:        graphql.Boolean,
+			},
+		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			gqlFields := getSelectedFields([]string{"users"}, p)
-			return GetUsers(gqlFields)
+			params := GetUsersParams{
+				GqlFields:                 getSelectedFields([]string{"users"}, p),
+				ShowUsersWithoutAuthCreds: false,
+			}
+			if val, ok := p.Args["showOnlyUsersWithoutAuthCreds"]; ok {
+				params.ShowUsersWithoutAuthCreds = val.(bool)
+			}
+			return GetUsers(params)
 		},
 	}
 
-	// userInputType := graphql.NewInputObject(graphql.InputObjectConfig{
-	// 	Name:        "UserInfoInputType",
-	// 	Description: "Fundraiser user",
-	// 	Fields: graphql.InputObjectConfigFieldMap{
-	// 		"name":     &graphql.InputObjectFieldConfig{Type: graphql.String},
-	// 		"id":       &graphql.InputObjectFieldConfig{Type: graphql.String},
-	// 		"group":    &graphql.InputObjectFieldConfig{Type: graphql.String},
-	// 		"password": &graphql.InputObjectFieldConfig{Type: graphql.String},
-	// 	},
-	// })
+	userInputType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name:        "UserInfoInputType",
+		Description: "Fundraiser user",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"id":           &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
+			"firstName":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"lastName":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"group":        &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"hasAuthCreds": &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
+		},
+	})
 
-	// mutationFields["addUsers"] = &graphql.Field{
-	// 	Type:        graphql.Boolean,
-	// 	Description: "Add user(s) to system",
-	// 	Args: graphql.FieldConfigArgument{
-	// 		"users": &graphql.ArgumentConfig{
-	// 			Description: "List of users",
-	// 			Type:        graphql.NewList(userInputType),
-	// 		},
-	// 		"token": &graphql.ArgumentConfig{
-	// 			Description: "Token",
-	// 			Type:        graphql.String,
-	// 		},
-	// 	},
-	// 	Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-	// 		// log.Println("Setting Config: ", p.Args["config"])
-	// 		token := ""
-	// 		if val, ok := p.Args["token"]; ok {
-	// 			token = val.(string)
-	// 		}
-
-	// 		jsonString, err := json.Marshal(p.Args["users"])
-	// 		if err != nil {
-	// 			log.Println("Error encoding JSON")
-	// 			return nil, nil
-	// 		}
-	// 		users := []UserInfo{}
-	// 		if err := json.Unmarshal([]byte(jsonString), &users); err != nil {
-	// 			log.Println("Error decoding JSON to userinfo")
-	// 			return nil, nil
-	// 		}
-	// 		return AddUsers(p.Context, users, token)
-	// 	},
-	// }
+	mutationFields["addOrUpdateUsers"] = &graphql.Field{
+		Type:        graphql.Boolean,
+		Description: "Add user(s) to system",
+		Args: graphql.FieldConfigArgument{
+			"users": &graphql.ArgumentConfig{
+				Description: "List of users",
+				Type:        graphql.NewList(userInputType),
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			// log.Println("Setting Config: ", p.Args["config"])
+			jsonString, err := json.Marshal(p.Args["users"])
+			if err != nil {
+				log.Println("Error encoding JSON")
+				return nil, nil
+			}
+			users := []UserInfo{}
+			if err := json.Unmarshal([]byte(jsonString), &users); err != nil {
+				log.Println("Error decoding JSON to userinfo")
+				return nil, nil
+			}
+			return AddOrUpdateUsers(p.Context, users)
+		},
+	}
 
 	//////////////////////////////////////////////////////////////////////////////
 	// Config Query Types
@@ -475,13 +492,6 @@ func init() {
 			"id":                 &graphql.Field{Type: graphql.Int},
 			"date":               &graphql.Field{Type: graphql.String},
 			"newOrderCutoffDate": &graphql.Field{Type: graphql.String},
-		},
-	})
-	neighborhoodConfigType := graphql.NewObject(graphql.ObjectConfig{
-		Name: "NeighborhoodConfigType",
-		Fields: graphql.Fields{
-			"name":              &graphql.Field{Type: graphql.String},
-			"distributionPoint": &graphql.Field{Type: graphql.String},
 		},
 	})
 	productPriceBreakConfigType := graphql.NewObject(graphql.ObjectConfig{
@@ -527,8 +537,8 @@ func init() {
 			"isLocked":             &graphql.Field{Type: graphql.Boolean},
 			"mulchDeliveryConfigs": &graphql.Field{Type: graphql.NewList(mulchDeliveryConfigType)},
 			"products":             &graphql.Field{Type: graphql.NewList(productConfigType)},
-			"neighborhoods":        &graphql.Field{Type: graphql.NewList(neighborhoodConfigType)},
 			"finalizationData":     &graphql.Field{Type: finalizationDataConfigType},
+			"neighborhoods":        queryFields["neighborhoods"],
 			"users":                queryFields["users"],
 		},
 	})
@@ -547,13 +557,6 @@ func init() {
 			"id":                 &graphql.InputObjectFieldConfig{Type: graphql.Int},
 			"date":               &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"newOrderCutoffDate": &graphql.InputObjectFieldConfig{Type: graphql.String},
-		},
-	})
-	neighborhoodInputConfigType := graphql.NewInputObject(graphql.InputObjectConfig{
-		Name: "NeighborhoodInputConfigType",
-		Fields: graphql.InputObjectConfigFieldMap{
-			"name":              &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"distributionPoint": &graphql.InputObjectFieldConfig{Type: graphql.String},
 		},
 	})
 	productPriceBreakInputConfigType := graphql.NewInputObject(graphql.InputObjectConfig{
@@ -599,7 +602,6 @@ func init() {
 			"isLocked":             &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
 			"mulchDeliveryConfigs": &graphql.InputObjectFieldConfig{Type: graphql.NewList(mulchDeliveryInputConfigType)},
 			"products":             &graphql.InputObjectFieldConfig{Type: graphql.NewList(productInputConfigType)},
-			"neighborhoods":        &graphql.InputObjectFieldConfig{Type: graphql.NewList(neighborhoodInputConfigType)},
 			"finalizationData":     &graphql.InputObjectFieldConfig{Type: finalizationDataInputConfigType},
 		},
 	})
@@ -710,6 +712,7 @@ func init() {
 			return CreateIssue(issue)
 		},
 	}
+
 	//////////////////////////////////////////////////////////////////////////////
 	// Set Fundraiser closeout allocations
 	allocationsInputType := graphql.NewInputObject(graphql.InputObjectConfig{
@@ -783,9 +786,6 @@ func init() {
 		},
 	}
 
-	// Deprecated for the more generic "summary" query
-	queryFields["summaryByOwnerId"] = &orderOwnerSummary
-
 	troopSummaryByGroupType := graphql.NewObject(graphql.ObjectConfig{
 		Name:        "TroopSummaryByGroupType",
 		Description: "Summary information for the different patrols",
@@ -828,9 +828,6 @@ func init() {
 		},
 	}
 
-	// Deprecated for the more generic "summary" query
-	queryFields["troopSummary"] = &troopSummary
-
 	neighborhoodSummaryType := graphql.NewObject(graphql.ObjectConfig{
 		Name: "NeighborhoodSummaryType",
 		Fields: graphql.Fields{
@@ -846,9 +843,6 @@ func init() {
 			return GetNeighborhoodSummary()
 		},
 	}
-
-	// Deprecated for the more generic "summary" query
-	queryFields["neighborhoodsSummary"] = &neighborhoodsSummary
 
 	summaryType := graphql.NewObject(graphql.ObjectConfig{
 		Name:        "SummaryType",
@@ -873,19 +867,70 @@ func init() {
 			return Shimmer{}, nil
 		},
 	}
-	// queryFields["testApi"] = &graphql.Field{
-	// 	Type:        graphql.Boolean,
-	// 	Description: "",
-	// 	Args: graphql.FieldConfigArgument{
-	// 		"param1": &graphql.ArgumentConfig{
-	// 			Description: "",
-	// 			Type:        graphql.NewNonNull(graphql.String),
-	// 		},
-	// 	},
-	// 	Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-	// 		return AdminTestApi(p.Context, p.Args["param1"].(string))
-	// 	},
-	// }
+
+	//////////////////////////////////////////////////////////////////////////////
+	// Resets Fundraiser User and Order Data
+	mutationFields["resetFundraisingData"] = &graphql.Field{
+		Type:        graphql.Boolean,
+		Description: "ResetFundraiser",
+		Args: graphql.FieldConfigArgument{
+			"doResetUsers": &graphql.ArgumentConfig{
+				Description: "Resets users list",
+				Type:        graphql.Boolean,
+			},
+			"doResetOrders": &graphql.ArgumentConfig{
+				Description: "Resets mulch orders, mulch spreaders, allocation summary, mulch delivery config, finalization data, and time cards data",
+				Type:        graphql.Boolean,
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			doResetUsers, doResetOrders := false, false
+			if val, ok := p.Args["doResetUsers"]; ok {
+				doResetUsers = val.(bool)
+			}
+			if val, ok := p.Args["doResetOrders"]; ok {
+				doResetOrders = val.(bool)
+			}
+			return ResetFundraisingData(p.Context, doResetUsers, doResetOrders)
+		},
+	}
+
+	//////////////////////////////////////////////////////////////////////////////
+	// Geolocation Address Type
+	addressType := graphql.NewObject(graphql.ObjectConfig{
+		Name:        "AddressType",
+		Description: "Address Information",
+		Fields: graphql.Fields{
+			"zipcode":     &graphql.Field{Type: graphql.Int},
+			"city":        &graphql.Field{Type: graphql.String},
+			"houseNumber": &graphql.Field{Type: graphql.String},
+			"street":      &graphql.Field{Type: graphql.String},
+		},
+	})
+	queryFields["getAddress"] = &graphql.Field{
+		Type:        addressType,
+		Description: "Retrieves Address from geo information",
+		Args: graphql.FieldConfigArgument{
+			"lat": &graphql.ArgumentConfig{
+				Description: "Latitude",
+				Type:        graphql.NewNonNull(graphql.Float),
+			},
+			"lng": &graphql.ArgumentConfig{
+				Description: "Longitude",
+				Type:        graphql.NewNonNull(graphql.Float),
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			var lat, lng float64
+			if val, ok := p.Args["lat"]; ok {
+				lat = val.(float64)
+			}
+			if val, ok := p.Args["lng"]; ok {
+				lng = val.(float64)
+			}
+			return GetAddrFromLatLng(p.Context, lat, lng)
+		},
+	}
 
 	schemaConfig := graphql.SchemaConfig{
 		Query:    graphql.NewObject(graphql.ObjectConfig{Name: "Query", Fields: graphql.Fields(queryFields)}),

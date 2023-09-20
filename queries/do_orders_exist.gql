@@ -1,0 +1,7 @@
+{
+  summary {
+    troop(numTopSellers: 1) {
+      totalAmountCollected
+    }
+  }
+}

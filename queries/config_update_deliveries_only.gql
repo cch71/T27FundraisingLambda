@@ -1,0 +1,16 @@
+mutation {
+  updateConfig(config: {
+    mulchDeliveryConfigs: [
+      {
+          id: 1,
+          date: "3/12/2023",
+          newOrderCutoffDate: "2/27/2023"
+      },
+      {
+          id: 2,
+          date: "4/9/2023",
+          newOrderCutoffDate: "3/24/2023"
+      }
+    ]
+  })
+}

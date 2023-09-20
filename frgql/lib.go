@@ -14,7 +14,8 @@ func MakeGqlQuery(ctx context.Context, gql string) ([]byte, error) {
 	params := graphql.Params{Schema: FrSchema, RequestString: gql, Context: ctx}
 	r := graphql.Do(params)
 	if len(r.Errors) > 0 {
-		log.Printf("failed to execute graphql operation, errors: %+v", r.Errors)
+		log.Printf("failed to execute graphql operation:\n%s\n, errors: %+v", gql, r.Errors)
+		return nil, r.Errors[0]
 	}
 
 	rJSON, err := json.Marshal(r)

@@ -1,0 +1,14 @@
+
+mutation {
+  addOrUpdateUsers(users: [{
+    id: "fruser1"
+    group: "Eagle"
+    firstName: "User"
+    lastName: "One"
+  },{
+    id: "fruser3"
+    group: "Owl"
+    firstName: "User"
+    lastName: "Three"
+  }])
+}

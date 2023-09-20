@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,21 +21,30 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/shopspring/decimal"
+
+	"github.com/codingsince1985/geo-golang"
+	"github.com/codingsince1985/geo-golang/openstreetmap"
 )
 
-////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////
 var (
-	dbMutex sync.Mutex
-	Db      *pgxpool.Pool
-	//mulchOrderFields bimap.BiMap
+	dbMutex  sync.Mutex
+	Db       *pgxpool.Pool
+	GEOCODER = get_geocoder()
 )
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
+func get_geocoder() geo.Geocoder {
+	geocoder := openstreetmap.Geocoder()
+
+	return geocoder
+}
+
+// //////////////////////////////////////////////////////////////////////////
 func OpenDb() error {
 	if Db == nil {
 		dbMutex.Lock()
@@ -51,16 +61,14 @@ func OpenDb() error {
 	return nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func CloseDb() {
 	if Db != nil {
 		Db.Close()
 	}
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func makeDbConnection() (*pgxpool.Pool, error) {
 
 	dbId := os.Getenv("DB_ID")
@@ -85,8 +93,8 @@ func makeDbConnection() (*pgxpool.Pool, error) {
 	return conn, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
+// Structure to handle JWT Claims
 type T27FrClaims struct {
 	Email    string   `json:"email"`
 	Roles    []string `json:"groups"`
@@ -95,6 +103,8 @@ type T27FrClaims struct {
 	jwt.StandardClaims
 }
 
+// //////////////////////////////////////////////////////////////////////////
+// Returns true if JWT is admin
 func (claims *T27FrClaims) isAdmin() bool {
 	for _, role := range claims.Roles {
 		if strings.HasSuffix(role, "FrAdmins") {
@@ -104,16 +114,20 @@ func (claims *T27FrClaims) isAdmin() bool {
 	return false
 }
 
+// //////////////////////////////////////////////////////////////////////////
+// Returns the JWT user id
 func (claims *T27FrClaims) userId() string {
 	return claims.Id
 }
 
+// //////////////////////////////////////////////////////////////////////////
+//
+//	Returns true if JWT user id matches provided user id
 func (claims *T27FrClaims) doesUidMatch(uid string) bool {
 	return claims.userId() == uid
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func parseTokenClaimsFromCtx(ctx context.Context) (*T27FrClaims, error) {
 	if v := ctx.Value("T27FrAuthorization"); v != nil {
 
@@ -131,9 +145,8 @@ func parseTokenClaimsFromCtx(ctx context.Context) (*T27FrClaims, error) {
 	return nil, errors.New("Not Authorized: Invalid token")
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
-func verifyAdminTokenFromCtx(ctx context.Context) error {
+// //////////////////////////////////////////////////////////////////////////
+func VerifyAdminTokenFromCtx(ctx context.Context) error {
 	claims, err := parseTokenClaimsFromCtx(ctx)
 	if err != nil {
 		return err
@@ -145,8 +158,7 @@ func verifyAdminTokenFromCtx(ctx context.Context) error {
 	return nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func verifyUidAllowedFromCtx(ctx context.Context, uid string) error {
 	claims, err := parseTokenClaimsFromCtx(ctx)
 	if err != nil {
@@ -166,8 +178,7 @@ func verifyUidAllowedFromCtx(ctx context.Context, uid string) error {
 	return nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type OwnerIdSummaryType struct {
 	TotalDeliveryMinutes                int
 	TotalNumBagsSold                    int
@@ -182,8 +193,7 @@ type OwnerIdSummaryType struct {
 	AllocationsTotal                    string
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 	log.Println("Getting Summary for onwerId: ", ownerId)
 
@@ -327,36 +337,32 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 	}, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type TopSellerType struct {
 	Name                 string
 	TotalAmountCollected string
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type GroupSummaryType struct {
 	GroupId              string
 	TotalAmountCollected string
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type TroopSummaryType struct {
 	TotalAmountCollected string
 	GroupSummary         []GroupSummaryType
 	TopSellers           []TopSellerType
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
 	log.Println("Getting Troop Summary with this many top sellers: ", numTopSellers)
 
-	sqlCmd := "select users.name, users.group_id, sum(total_amount_collected)::string from mulch_orders" +
+	sqlCmd := "select users.first_name, users.last_name, users.group_id, sum(total_amount_collected)::string from mulch_orders" +
 		" inner join users on (mulch_orders.order_owner_id = users.id) where" +
-		" total_amount_collected is not null group by order_owner_id, users.name, users.group_id"
+		" total_amount_collected is not null group by order_owner_id, users.first_name, users.last_name, users.group_id"
 
 	rows, err := Db.Query(context.Background(), sqlCmd)
 	if err != nil {
@@ -370,11 +376,12 @@ func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
 	topSellers := []TopSellerType{}
 
 	for rows.Next() {
-		var name string
+		var firstName string
+		var lastName string
 		var group string
 		var totalAsStr string
 
-		err = rows.Scan(&name, &group, &totalAsStr)
+		err = rows.Scan(&firstName, &lastName, &group, &totalAsStr)
 		if err != nil {
 			log.Println("Reading Summary row failed: ", err)
 			return TroopSummaryType{}, err
@@ -391,7 +398,7 @@ func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
 			groupTotals[group] = total
 		}
 
-		topSellers = append(topSellers, TopSellerType{Name: name, TotalAmountCollected: totalAsStr})
+		topSellers = append(topSellers, TopSellerType{Name: fmt.Sprintf("%s %s", firstName, lastName), TotalAmountCollected: totalAsStr})
 	}
 
 	if rows.Err() != nil {
@@ -428,13 +435,13 @@ func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
 
 }
 
+// //////////////////////////////////////////////////////////////////////////
 type NeighborhoodSummaryType struct {
 	Neighborhood string `json:"neighborhood"`
 	NumOrders    int    `json:"numOrders"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetNeighborhoodSummary() ([]NeighborhoodSummaryType, error) {
 	log.Println("Getting Neighborhood Summary")
 
@@ -468,27 +475,26 @@ func GetNeighborhoodSummary() ([]NeighborhoodSummaryType, error) {
 	return results, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type CustomerType struct {
 	Name         string
 	Addr1        string
 	Addr2        *string
+	City         *string
+	Zipcode      *int
 	Phone        string
 	Email        *string
 	Neighborhood string
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type ProductsType struct {
 	ProductId     string `json:"productId"`
 	NumSold       int    `json:"numSold"`
 	AmountCharged string `json:"amountCharged,omitempty"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type MulchOrderType struct {
 	OrderId                   string
 	OwnerId                   string
@@ -505,21 +511,112 @@ type MulchOrderType struct {
 	Spreaders                 []string
 	Customer                  CustomerType
 	Purchases                 []ProductsType
-	DeliveryId                *int   // Not in archived GraphQL
-	YearOrdered               string // Not in non archived GraphQL
+	DeliveryId                *int // Not in archived GraphQL
+	Comments                  *string
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
+type MulchOrderMoneyCollectedType struct {
+	OwnerId                        string
+	AmountTotalCollected           *string
+	AmountTotalFromCashCollected   *string
+	AmountTotalFromChecksCollected *string
+	DeliveryId                     *int
+}
+
+// //////////////////////////////////////////////////////////////////////////
 type GetMulchOrdersParams struct {
-	OwnerId       string
-	GqlFields     []string
-	IsFromArchive bool
-	ArchiveYear   string
+	OwnerId    string
+	SpreaderId string
+	GqlFields  []string
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
+func GetMulchOrdersMoneyCollected(params GetMulchOrdersParams) []MulchOrderMoneyCollectedType {
+
+	////////////////////////////////////////////////////////////////////////////
+	//
+	gql2sql := func(orderOutput *MulchOrderMoneyCollectedType) ([]string, []interface{}, string) {
+
+		sqlFields := []string{}
+		inputs := []interface{}{}
+		joinSql := ""
+		for _, gqlField := range params.GqlFields {
+			// log.Println(gqlField)
+			switch {
+			case gqlField == "ownerId":
+				inputs = append(inputs, &orderOutput.OwnerId)
+				sqlFields = append(sqlFields, "order_owner_id")
+			case gqlField == "deliveryId":
+				inputs = append(inputs, &orderOutput.DeliveryId)
+				sqlFields = append(sqlFields, "delivery_id")
+			case gqlField == "amountTotalCollected":
+				inputs = append(inputs, &orderOutput.AmountTotalCollected)
+				sqlFields = append(sqlFields, "SUM(total_amount_collected)::string")
+			case gqlField == "amountTotalFromCashCollected":
+				inputs = append(inputs, &orderOutput.AmountTotalFromCashCollected)
+				sqlFields = append(sqlFields, "SUM(cash_amount_collected)::string")
+			case gqlField == "amountTotalFromChecksCollected":
+				inputs = append(inputs, &orderOutput.AmountTotalFromChecksCollected)
+				sqlFields = append(sqlFields, "SUM(check_amount_collected)::string")
+			default:
+				log.Println("Do not know how to handle GraphQL Field: ", gqlField)
+			}
+
+		}
+		return sqlFields, inputs, joinSql
+	}
+
+	order := MulchOrderMoneyCollectedType{}
+	sqlFields, _, joinSql := gql2sql(&order)
+
+	if 0 == len(params.OwnerId) {
+		log.Println("Retrieving mulch orders money collected.")
+
+	} else {
+		log.Println("Retrieving mulch orders money collected. OwnerId: ", params.OwnerId)
+	}
+
+	doQuery := func() (pgx.Rows, error) {
+		sqlCmd := fmt.Sprintf("select %s from mulch_orders %s", strings.Join(sqlFields, ","), joinSql)
+		if len(params.OwnerId) != 0 {
+			sqlCmd = sqlCmd + " where order_owner_id=$1 group by order_owner_id, delivery_id"
+			log.Println("SqlCmd: ", sqlCmd)
+			return Db.Query(context.Background(), sqlCmd, params.OwnerId)
+		} else {
+			sqlCmd = sqlCmd + " group by order_owner_id, delivery_id"
+			log.Println("SqlCmd: ", sqlCmd)
+			return Db.Query(context.Background(), sqlCmd)
+		}
+	}
+
+	orders := []MulchOrderMoneyCollectedType{}
+	rows, err := doQuery()
+	if err != nil {
+		log.Println("Mulch Orders query failed", err)
+		return orders
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		order := MulchOrderMoneyCollectedType{}
+		_, inputs, _ := gql2sql(&order)
+		err = rows.Scan(inputs...)
+		if err != nil {
+			log.Println("Reading mulch order money collection row failed: ", err)
+			continue
+		}
+		orders = append(orders, order)
+	}
+
+	if rows.Err() != nil {
+		log.Println("Reading mulch order money collection rows had an issue: ", err)
+		return []MulchOrderMoneyCollectedType{}
+	}
+	return orders
+}
+
+// //////////////////////////////////////////////////////////////////////////
 func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]string, []interface{}, string) {
 
 	sqlFields := []string{}
@@ -537,15 +634,15 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 		case gqlField == "amountTotalCollected":
 			inputs = append(inputs, &orderOutput.AmountTotalCollected)
 			sqlFields = append(sqlFields, "total_amount_collected::string")
-		case gqlField == "yearOrdered":
-			inputs = append(inputs, &orderOutput.YearOrdered)
-			sqlFields = append(sqlFields, "year_ordered::string")
 		case gqlField == "purchases":
 			inputs = append(inputs, &orderOutput.Purchases)
 			sqlFields = append(sqlFields, "purchases::jsonb")
 		case gqlField == "last_modified_time":
 			inputs = append(inputs, &orderOutput.LastModifiedTime)
 			sqlFields = append(sqlFields, "last_modified_time")
+		case gqlField == "comments":
+			inputs = append(inputs, &orderOutput.Comments)
+			sqlFields = append(sqlFields, "comments")
 		case gqlField == "specialInstructions":
 			inputs = append(inputs, &orderOutput.SpecialInstructions)
 			sqlFields = append(sqlFields, "special_instructions")
@@ -575,7 +672,7 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 			sqlFields = append(sqlFields, "is_verified")
 		case gqlField == "spreaders":
 			inputs = append(inputs, &orderOutput.Spreaders)
-			sqlFields = append(sqlFields, "spreaders::jsonb")
+			sqlFields = append(sqlFields, "spreaders")
 			joinSql = "LEFT JOIN mulch_spreaders ON mulch_orders.order_id = mulch_spreaders.order_id"
 		case gqlField == "customer":
 			inputs = append(inputs, &orderOutput.Customer.Name)
@@ -584,6 +681,10 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 			sqlFields = append(sqlFields, "customer_addr1")
 			inputs = append(inputs, &orderOutput.Customer.Addr2)
 			sqlFields = append(sqlFields, "customer_addr2")
+			inputs = append(inputs, &orderOutput.Customer.City)
+			sqlFields = append(sqlFields, "customer_city")
+			inputs = append(inputs, &orderOutput.Customer.Zipcode)
+			sqlFields = append(sqlFields, "customer_zipcode")
 			inputs = append(inputs, &orderOutput.Customer.Phone)
 			sqlFields = append(sqlFields, "customer_phone")
 			inputs = append(inputs, &orderOutput.Customer.Email)
@@ -598,43 +699,41 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 	return sqlFields, inputs, joinSql
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 
+	// select order_id  from mulch_spreaders where 'fruser2' = any(spreaders);
 	//select order_owner_id, spreaders from mulch_orders left join mulch_spreaders on mulch_orders.order_id = mulch_spreaders.order_id
 	//where mulch_orders.order_id = '2a166081-787f-4ff6-9477-31b21b6ca2f7';
 
 	order := MulchOrderType{}
 	sqlFields, _, joinSql := mulchOrderGql2SqlMap(params.GqlFields, &order)
 
-	dbTable := "mulch_orders"
-	if params.IsFromArchive {
-		dbTable = "archived_mulch_orders"
-	}
-
 	if 0 == len(params.OwnerId) {
-		log.Println("Retrieving mulch orders. ", "Is targeting archive: ", params.IsFromArchive)
+		log.Println("Retrieving mulch orders.")
 
 	} else {
-		log.Println("Retrieving mulch orders. ", "Is targeting archive: ", params.IsFromArchive, " OwnerId: ", params.OwnerId)
-
+		log.Println("Retrieving mulch orders. OwnerId: ", params.OwnerId)
 	}
 
-	doQuery := func(id *string, dbTable *string, sqlFields []string) (pgx.Rows, error) {
-		sqlCmd := fmt.Sprintf("select %s from %s %s", strings.Join(sqlFields, ","), *dbTable, joinSql)
-		if len(*id) == 0 {
-			log.Println("SqlCmd: ", sqlCmd)
-			return Db.Query(context.Background(), sqlCmd)
-		} else {
+	doQuery := func() (pgx.Rows, error) {
+		sqlCmd := fmt.Sprintf("select %s from mulch_orders %s", strings.Join(sqlFields, ","), joinSql)
+		if len(params.OwnerId) != 0 {
 			sqlCmd = sqlCmd + " where order_owner_id=$1"
 			log.Println("SqlCmd: ", sqlCmd)
-			return Db.Query(context.Background(), sqlCmd, *id)
+			return Db.Query(context.Background(), sqlCmd, params.OwnerId)
+		} else if len(params.SpreaderId) != 0 {
+			sqlCmd = sqlCmd + " where $1=any(spreaders)"
+			log.Println("SqlCmd: ", sqlCmd)
+			return Db.Query(context.Background(), sqlCmd, params.SpreaderId)
+		} else {
+			log.Println("SqlCmd: ", sqlCmd)
+			return Db.Query(context.Background(), sqlCmd)
 		}
 	}
 
 	orders := []MulchOrderType{}
-	rows, err := doQuery(&params.OwnerId, &dbTable, sqlFields)
+	rows, err := doQuery()
 	if err != nil {
 		log.Println("Mulch Orders query failed", err)
 		return orders
@@ -659,26 +758,20 @@ func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 	return orders
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type GetMulchOrderParams struct {
-	OrderId       string
-	GqlFields     []string
-	IsFromArchive bool
+	OrderId   string
+	GqlFields []string
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetMulchOrder(params GetMulchOrderParams) MulchOrderType {
-	log.Println("Retrieving mulch order. ", "Is targeting archive: ", params.IsFromArchive, " OrderId: ", params.OrderId)
+	log.Println("Retrieving mulch order. OrderId: ", params.OrderId)
 
 	order := MulchOrderType{}
 	sqlFields, inputs, joinSql := mulchOrderGql2SqlMap(params.GqlFields, &order)
 
 	dbTable := "mulch_orders"
-	if params.IsFromArchive {
-		dbTable = "archived_mulch_orders"
-	}
 	sqlCmd := fmt.Sprintf("select %s from %s %s where mulch_orders.order_id=$1", strings.Join(sqlFields, ","), dbTable, joinSql)
 	log.Println("SqlCmd: ", sqlCmd)
 	err := Db.QueryRow(context.Background(), sqlCmd, params.OrderId).Scan(inputs...)
@@ -689,6 +782,7 @@ func GetMulchOrder(params GetMulchOrderParams) MulchOrderType {
 	return order
 }
 
+// //////////////////////////////////////////////////////////////////////////
 func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 	order.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
 	values := []interface{}{}
@@ -717,6 +811,12 @@ func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 		sqlFields = append(sqlFields, "purchases")
 		values = append(values, order.Purchases)
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::jsonb", valIdx))
+		valIdx++
+	}
+	if nil != order.Comments {
+		sqlFields = append(sqlFields, "comments")
+		values = append(values, *order.Comments)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
 		valIdx++
 	}
 	if nil != order.SpecialInstructions {
@@ -797,6 +897,18 @@ func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
 		valIdx++
 	}
+	if nil != order.Customer.City {
+		sqlFields = append(sqlFields, "customer_city")
+		values = append(values, *order.Customer.City)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+	if nil != order.Customer.Zipcode {
+		sqlFields = append(sqlFields, "customer_zipcode")
+		values = append(values, *order.Customer.Zipcode)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::int", valIdx))
+		valIdx++
+	}
 	if len(order.Customer.Phone) != 0 {
 		sqlFields = append(sqlFields, "customer_phone")
 		values = append(values, order.Customer.Phone)
@@ -819,8 +931,7 @@ func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 	return sqlFields, valIdxs, values
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func CreateMulchOrder(ctx context.Context, order MulchOrderType) (string, error) {
 	log.Println("Creating Order: ", order)
 
@@ -864,8 +975,7 @@ func CreateMulchOrder(ctx context.Context, order MulchOrderType) (string, error)
 	return order.OrderId, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func UpdateMulchOrder(ctx context.Context, order MulchOrderType) (bool, error) {
 	log.Println("Updating Order: ", order)
 
@@ -879,33 +989,6 @@ func UpdateMulchOrder(ctx context.Context, order MulchOrderType) (bool, error) {
 	if err := verifyUidAllowedFromCtx(ctx, order.OwnerId); err != nil {
 		return false, err
 	}
-
-	//This was actually only updating the specified fields not updating the optional ones so changing to
-	// delete existing record and adding new one
-	/*
-			sqlFields, valIdxs, values := OrderType2Sql(order)
-
-			updateSqlFields := []string{}
-			for i, sqlField := range sqlFields {
-				updateSqlFields = append(updateSqlFields, fmt.Sprintf("%s = %s", sqlField, valIdxs[i]))
-			}
-
-			updateSqlFields = updateSqlFields[1:] //Pop off Order id from the list
-			//values still has OrderId at pos 0 which is what we want so don't need to chop it off
-
-			sqlCmd := fmt.Sprintf("update mulch_orders set %s where order_id = $1", strings.Join(updateSqlFields, ","))
-
-			log.Println("Updating Order sqlCmd: ", sqlCmd)
-			res, err := Db.Exec(context.Background(), sqlCmd, values...)
-			if err != nil {
-				return false, err
-			}
-			if 1 != res.RowsAffected() {
-				return false, errors.New("There were 0 records updated")
-			}
-
-		        return true, nil
-	*/
 
 	sqlFields, valIdxs, values := OrderType2Sql(order)
 
@@ -941,8 +1024,7 @@ func UpdateMulchOrder(ctx context.Context, order MulchOrderType) (bool, error) {
 
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func DeleteMulchOrder(ctx context.Context, orderId string) (bool, error) {
 	log.Println("Deleteing Order with order id: ", orderId)
 
@@ -968,30 +1050,20 @@ func DeleteMulchOrder(ctx context.Context, orderId string) (bool, error) {
 	return true, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type MulchDeliveryConfigType struct {
 	Id                 int    `json:"id"`
 	Date               string `json:"date"`
 	NewOrderCutoffDate string `json:"newOrderCutoffDate"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
-type NeighborhoodsType struct {
-	Name              string `json: name`
-	DistributionPoint string `json:"distributionPoint"`
-}
-
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type ProductPriceBreaks struct {
 	Gt        int    `json:"gt"`
 	UnitPrice string `json:"unitPrice"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type ProductType struct {
 	Id          string               `json:"id"`
 	Label       string               `json:"label"`
@@ -1000,8 +1072,7 @@ type ProductType struct {
 	PriceBreaks []ProductPriceBreaks `json:"priceBreaks"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type FinalizationDataType struct {
 	BankDeposited              string `json:"bankDeposited"`
 	MulchCost                  string `json:"mulchCost"`
@@ -1016,21 +1087,18 @@ type FinalizationDataType struct {
 	DeliveryEarningsPerMinute  string `json:"deliveryEarningsPerMinute"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type FrConfigType struct {
-	Kind                 string                    `json:"kind"`
-	Description          string                    `json:"description"`
-	LastModifiedTime     string                    `json:"lastModifiedTime"`
-	IsLocked             *bool                     `json:"isLocked"`
-	Neighborhoods        []NeighborhoodsType       `json:"neighborhoods"`
-	MulchDeliveryConfigs []MulchDeliveryConfigType `json:"mulchDeliveryConfigs"`
-	Products             []ProductType             `json:"products"`
-	FinalizationData     *FinalizationDataType     `json:"finalizationData"`
+	Kind                 string                     `json:"kind"`
+	Description          string                     `json:"description"`
+	LastModifiedTime     string                     `json:"lastModifiedTime"`
+	IsLocked             *bool                      `json:"isLocked"`
+	MulchDeliveryConfigs *[]MulchDeliveryConfigType `json:"mulchDeliveryConfigs"`
+	Products             []ProductType              `json:"products"`
+	FinalizationData     *FinalizationDataType      `json:"finalizationData"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
 
 	log.Println("Retrieving Fundraiser Config")
@@ -1050,9 +1118,6 @@ func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
 		case "lastModifiedTime" == gqlField:
 			params = append(params, &frConfig.LastModifiedTime)
 			sqlFields = append(sqlFields, "last_modified_time::string")
-		case "neighborhoods" == gqlField:
-			params = append(params, &frConfig.Neighborhoods)
-			sqlFields = append(sqlFields, "neighborhoods::jsonb")
 		case "mulchDeliveryConfigs" == gqlField:
 			params = append(params, &frConfig.MulchDeliveryConfigs)
 			sqlFields = append(sqlFields, "mulch_delivery_configs::jsonb")
@@ -1066,6 +1131,7 @@ func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
 			params = append(params, &frConfig.IsLocked)
 			sqlFields = append(sqlFields, "is_locked")
 		case "users" == gqlField:
+		case "neighborhoods" == gqlField:
 			//Skipping because it is handled seperately
 		default:
 			return frConfig, errors.New(fmt.Sprintf("Unknown fundraiser config field: %s", gqlField))
@@ -1083,8 +1149,7 @@ func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
 	return frConfig, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func FrConfigType2Sql(frConfig FrConfigType) ([]string, []string, []interface{}) {
 	values := []interface{}{}
 	sqlFields := []string{}
@@ -1102,21 +1167,15 @@ func FrConfigType2Sql(frConfig FrConfigType) ([]string, []string, []interface{})
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
 		valIdx++
 	}
-	if len(frConfig.Neighborhoods) != 0 {
-		sqlFields = append(sqlFields, "neighborhoods")
-		values = append(values, frConfig.Neighborhoods)
-		valIdxs = append(valIdxs, fmt.Sprintf("$%d::jsonb", valIdx))
-		valIdx++
-	}
 	if len(frConfig.Products) != 0 {
 		sqlFields = append(sqlFields, "products")
 		values = append(values, frConfig.Products)
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::jsonb", valIdx))
 		valIdx++
 	}
-	if len(frConfig.MulchDeliveryConfigs) != 0 {
+	if nil != frConfig.MulchDeliveryConfigs {
 		sqlFields = append(sqlFields, "mulch_delivery_configs")
-		values = append(values, frConfig.MulchDeliveryConfigs)
+		values = append(values, *frConfig.MulchDeliveryConfigs)
 		valIdxs = append(valIdxs, fmt.Sprintf("$%d::jsonb", valIdx))
 		valIdx++
 	}
@@ -1141,14 +1200,15 @@ func FrConfigType2Sql(frConfig FrConfigType) ([]string, []string, []interface{})
 	return sqlFields, valIdxs, values
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
-func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, error) {
+// //////////////////////////////////////////////////////////////////////////
+func setFundraiserConfigWithTrxn(ctx context.Context, trxn *pgx.Tx, frConfig FrConfigType) error {
 	frConfig.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
-	log.Println("Setting Fundraiding Config: ", frConfig)
+	log.Println("Setting Fundraiding Config (with Trxn): ", frConfig)
 
-	if err := verifyAdminTokenFromCtx(ctx); err != nil {
-		return false, err
+	log.Println("Deleting existing record")
+	_, err := (*trxn).Exec(context.Background(), "delete from fundraiser_config")
+	if err != nil {
+		return err
 	}
 
 	sqlFields, valIdxs, values := FrConfigType2Sql(frConfig)
@@ -1156,21 +1216,29 @@ func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, erro
 	sqlCmd := fmt.Sprintf("insert into fundraiser_config(%s) values (%s)",
 		strings.Join(sqlFields, ","), strings.Join(valIdxs, ","))
 
+	log.Println("Setting Config SqlCmd: ", sqlCmd)
+	_, err = (*trxn).Exec(context.Background(), sqlCmd, values...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// //////////////////////////////////////////////////////////////////////////
+func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, error) {
+	log.Println("Setting Fundraiding Config: ", frConfig)
+
+	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
 	// Start Database Operations
 	trxn, err := Db.Begin(context.Background())
 	if err != nil {
 		return false, err
 	}
 
-	log.Println("Deleting existing record")
-	_, err = trxn.Exec(context.Background(), "delete from fundraiser_config")
-	if err != nil {
-		trxn.Rollback(context.Background())
-		return false, err
-	}
-	log.Println("Setting Config SqlCmd: ", sqlCmd)
-	_, err = trxn.Exec(context.Background(), sqlCmd, values...)
-	if err != nil {
+	if err := setFundraiserConfigWithTrxn(ctx, &trxn, frConfig); err != nil {
 		trxn.Rollback(context.Background())
 		return false, err
 	}
@@ -1183,15 +1251,10 @@ func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, erro
 	return true, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
-func UpdateFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, error) {
+// //////////////////////////////////////////////////////////////////////////
+func updateFundraiserConfigWithTrxn(ctx context.Context, trxn *pgx.Tx, frConfig FrConfigType) error {
 	frConfig.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
-	log.Println("Updating Fundraiding Config: ", frConfig)
-
-	if err := verifyAdminTokenFromCtx(ctx); err != nil {
-		return false, err
-	}
+	log.Println("Updating Fundraiding Config (with Trxn): ", frConfig)
 
 	sqlFields, valIdxs, values := FrConfigType2Sql(frConfig)
 
@@ -1205,7 +1268,35 @@ func UpdateFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, e
 		strings.Join(updateSqlFlds, ","))
 
 	log.Println("Update Config SqlCmd: ", sqlCmd)
-	_, err := Db.Exec(context.Background(), sqlCmd, values...)
+	_, err := (*trxn).Exec(context.Background(), sqlCmd, values...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// //////////////////////////////////////////////////////////////////////////
+func UpdateFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, error) {
+	frConfig.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
+	log.Println("Updating Fundraiding Config")
+
+	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
+	// Start Database Operations
+	trxn, err := Db.Begin(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	if err := updateFundraiserConfigWithTrxn(ctx, &trxn, frConfig); err != nil {
+		trxn.Rollback(context.Background())
+		return false, err
+	}
+
+	log.Println("About to make a commitment")
+	err = trxn.Commit(context.Background())
 	if err != nil {
 		return false, err
 	}
@@ -1213,8 +1304,223 @@ func UpdateFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, e
 	return true, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
+type NeighborhoodInfo struct {
+	Name              string  `json: name`
+	Zipcode           *int    `json: zipcode`
+	City              *string `json: city`
+	IsVisible         *bool   `json: is_visible`
+	DistributionPoint *string `json:"distributionPoint"`
+	LastModifiedTime  string  `json:"lastModifiedTime"`
+}
+
+// //////////////////////////////////////////////////////////////////////////
+func GetNeighborhoods(gqlFields []string) ([]NeighborhoodInfo, error) {
+
+	log.Println("Retrieving Fundraiser Neighborhoods")
+
+	neighborhoods := []NeighborhoodInfo{}
+	sqlFields := []string{}
+
+	for _, gqlField := range gqlFields {
+		switch {
+		case "name" == gqlField:
+			sqlFields = append(sqlFields, "name")
+		case "zipcode" == gqlField:
+			sqlFields = append(sqlFields, "zipcode")
+		case "city" == gqlField:
+			sqlFields = append(sqlFields, "city")
+		case "isVisible" == gqlField:
+			sqlFields = append(sqlFields, "is_visible")
+		case "distributionPoint" == gqlField:
+			sqlFields = append(sqlFields, "dist_pt")
+		default:
+			return neighborhoods, errors.New(fmt.Sprintf("Unknown fundraiser neighborhood field: %s", gqlField))
+		}
+
+	}
+
+	sqlCmd := fmt.Sprintf("select %s from neighborhoods", strings.Join(sqlFields, ","))
+	rows, err := Db.Query(context.Background(), sqlCmd)
+	if err != nil {
+		log.Println("Neighborhood query failed", err)
+		return neighborhoods, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		hood := NeighborhoodInfo{}
+		inputs := []interface{}{}
+		for _, gqlField := range gqlFields {
+			switch {
+			case "name" == gqlField:
+				inputs = append(inputs, &hood.Name)
+			case "zipcode" == gqlField:
+				inputs = append(inputs, &hood.Zipcode)
+			case "city" == gqlField:
+				inputs = append(inputs, &hood.City)
+			case "isVisible" == gqlField:
+				inputs = append(inputs, &hood.IsVisible)
+			case "distributionPoint" == gqlField:
+				inputs = append(inputs, &hood.DistributionPoint)
+			default:
+				return neighborhoods, errors.New(fmt.Sprintf("Unknown fundraiser neighborhood field: %s", gqlField))
+			}
+
+		}
+		err = rows.Scan(inputs...)
+		if err != nil {
+			log.Println("Reading Neighborhood row failed: ", err)
+			continue
+		}
+		neighborhoods = append(neighborhoods, hood)
+	}
+
+	if rows.Err() != nil {
+		log.Println("Reading Neighborhood rows had an issue: ", err)
+		return []NeighborhoodInfo{}, err
+	}
+	return neighborhoods, nil
+}
+
+// //////////////////////////////////////////////////////////////////////////
+func FrHoodType2Sql(hood NeighborhoodInfo, isUpdate bool) ([]string, []string, []interface{}) {
+	values := []interface{}{}
+	sqlFields := []string{}
+	valIdxs := []string{}
+	valIdx := 1
+
+	// We don't use Name when we are updating
+	if !isUpdate && len(hood.Name) != 0 {
+		sqlFields = append(sqlFields, "name")
+		values = append(values, hood.Name)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+	if nil != hood.Zipcode {
+		sqlFields = append(sqlFields, "zipcode")
+		values = append(values, *hood.Zipcode)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::int", valIdx))
+		valIdx++
+	}
+	if nil != hood.City {
+		sqlFields = append(sqlFields, "city")
+		values = append(values, *hood.City)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+	if nil != hood.DistributionPoint {
+		sqlFields = append(sqlFields, "dist_pt")
+		values = append(values, *hood.DistributionPoint)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+	if nil != hood.IsVisible {
+		// Unfortunately hard to detect if this is set or not
+		sqlFields = append(sqlFields, "is_visible")
+		values = append(values, *hood.IsVisible)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::bool", valIdx))
+		valIdx++
+	}
+
+	// Always do timestamp
+	sqlFields = append(sqlFields, "last_modified_time")
+	values = append(values, hood.LastModifiedTime)
+	valIdxs = append(valIdxs, fmt.Sprintf("$%d::timestamp", valIdx))
+	return sqlFields, valIdxs, values
+}
+
+// //////////////////////////////////////////////////////////////////////////
+func AddOrUpdateNeighborhoods(ctx context.Context, hoods []NeighborhoodInfo) (bool, error) {
+	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
+	log.Println("Adding Neighborhoods at: ", lastModifiedTime)
+
+	// If it was empty we don't need to do anything
+	if len(hoods) == 0 {
+		log.Println("Empty array of neighborhoods passed in")
+		return true, nil
+	}
+
+	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
+	existingHoods, err := GetNeighborhoods([]string{"name"})
+	if err != nil {
+		return false, err
+	}
+
+	doesAlreadyExist := func(newHood string) bool {
+		for _, existingHood := range existingHoods {
+			if existingHood.Name == newHood {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Start Database Operations
+	trxn, err := Db.Begin(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	genSqlCmd := func(hood NeighborhoodInfo, isUpdate bool) (string, []interface{}) {
+		hood.LastModifiedTime = lastModifiedTime
+		sqlFields, valIdxs, values := FrHoodType2Sql(hood, isUpdate)
+		sqlCmd := ""
+		if isUpdate {
+			log.Println("Neighborhood: ", hood.Name, " already exists and so updating")
+			updateSqlFlds := []string{}
+			for i, f := range sqlFields {
+				updateSqlFlds = append(updateSqlFlds, fmt.Sprintf("%s=%s", f, valIdxs[i]))
+			}
+
+			sqlCmd = fmt.Sprintf(
+				"UPDATE neighborhoods SET %s WHERE name = '%s'",
+				strings.Join(updateSqlFlds, ","),
+				hood.Name,
+			)
+		} else {
+			log.Println("Neighborhood: ", hood.Name, " does not exists and so adding it")
+			sqlCmd = fmt.Sprintf("insert into neighborhoods(%s) values (%s)",
+				strings.Join(sqlFields, ","), strings.Join(valIdxs, ","))
+		}
+
+		log.Println("Neighborhood SqlCmd: ", sqlCmd)
+		return sqlCmd, values
+	}
+
+	for _, hood := range hoods {
+
+		sqlCmd, values := genSqlCmd(hood, doesAlreadyExist(hood.Name))
+
+		_, err = trxn.Exec(context.Background(), sqlCmd, values...)
+		if err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
+		existingHoods = append(existingHoods, hood)
+	}
+
+	// Even though neighborhoods aren't a part of the fundariser config table we still treat it like it is so
+	// trigger time update to force re-download of config data.
+
+	if err := updateFundraiserConfigWithTrxn(ctx, &trxn, FrConfigType{}); err != nil {
+		trxn.Rollback(context.Background())
+		return false, err
+	}
+
+	log.Println("About to make a commitment")
+	err = trxn.Commit(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+// //////////////////////////////////////////////////////////////////////////
 type MulchTimecardType struct {
 	Id               string `json:"id"`
 	DeliveryId       int    `json:"deliveryId"`
@@ -1224,8 +1530,7 @@ type MulchTimecardType struct {
 	TimeTotal        string `json:"timeTotal"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func mulchTimecardGql2SqlMap(gqlFields []string, tc *MulchTimecardType) ([]string, []interface{}) {
 
 	sqlFields := []string{}
@@ -1259,8 +1564,7 @@ func mulchTimecardGql2SqlMap(gqlFields []string, tc *MulchTimecardType) ([]strin
 	return sqlFields, inputs
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetMulchTimecards(id string, deliveryId int, gqlFields []string) ([]MulchTimecardType, error) {
 	timecards := []MulchTimecardType{}
 
@@ -1318,13 +1622,12 @@ func GetMulchTimecards(id string, deliveryId int, gqlFields []string) ([]MulchTi
 	return timecards, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func SetMulchTimecards(ctx context.Context, timecards []MulchTimecardType) (bool, error) {
 	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
 	log.Println("Setting Timecards at: ", lastModifiedTime)
 
-	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
 		return false, err
 	}
 
@@ -1364,39 +1667,72 @@ func SetMulchTimecards(ctx context.Context, timecards []MulchTimecardType) (bool
 	return true, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type UserInfo struct {
-	Name     string `json:"name"`
-	Id       string `json:"id"`
-	Group    string `json:"group"`
-	Password string `json:"password,omitempty"`
+	FirstName        string `json:"firstName"`
+	LastName         string `json:"lastName"`
+	Id               string `json:"id"`
+	Group            string `json:"group"`
+	Name             string `json:"name,omitempty"`
+	HasAuthCreds     *bool  `json:"hasAuthCreds,omitempty"`
+	LastModifiedTime string `json:"lastModifiedTime,omitempty"`
+	CreatedTime      string `json:"createdTime,omitempty"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
-func GetUsers(gqlFields []string) ([]UserInfo, error) {
+// //////////////////////////////////////////////////////////////////////////
+type GetUsersParams struct {
+	GqlFields                 []string
+	ShowUsersWithoutAuthCreds bool
+}
+
+// //////////////////////////////////////////////////////////////////////////
+func GetUsers(params GetUsersParams) ([]UserInfo, error) {
 
 	log.Println("Retrieving Fundraiser Users")
 
 	users := []UserInfo{}
-	sqlFields := []string{}
 
-	for _, gqlField := range gqlFields {
-		switch {
-		case "name" == gqlField:
-			sqlFields = append(sqlFields, "name")
-		case "id" == gqlField:
-			sqlFields = append(sqlFields, "id")
-		case "group" == gqlField:
-			sqlFields = append(sqlFields, "group_id")
-		default:
-			return users, errors.New(fmt.Sprintf("Unknown fundraiser user field: %s", gqlField))
+	getSqlFields := func() ([]string, bool, error) {
+		sqlFieldSet := make(map[string]struct{})
+		sqlFields := []string{}
+		doWantFullNames := false
+		exists := struct{}{}
+		for _, gqlField := range params.GqlFields {
+			switch {
+			case "firstName" == gqlField:
+				sqlFieldSet["first_name"] = exists
+			case "lastName" == gqlField:
+				sqlFieldSet["last_name"] = exists
+			case "name" == gqlField:
+				doWantFullNames = true
+				sqlFieldSet["first_name"] = exists
+				sqlFieldSet["last_name"] = exists
+			case "id" == gqlField:
+				sqlFieldSet["id"] = exists
+			case "group" == gqlField:
+				sqlFieldSet["group_id"] = exists
+			case "hasAuthCreds" == gqlField:
+				sqlFieldSet["has_auth_creds"] = exists
+			default:
+				return sqlFields, false, errors.New(fmt.Sprintf("Unknown fundraiser user field: %s", gqlField))
+			}
 		}
+		for k, _ := range sqlFieldSet {
+			sqlFields = append(sqlFields, k)
+		}
+		return sqlFields, doWantFullNames, nil
+	}
 
+	sqlFields, doWantFullNames, err := getSqlFields()
+	if err != nil {
+		return users, err
 	}
 
 	sqlCmd := fmt.Sprintf("select %s from users", strings.Join(sqlFields, ","))
+	if params.ShowUsersWithoutAuthCreds {
+		sqlCmd = sqlCmd + " where not has_auth_creds"
+	}
+
 	rows, err := Db.Query(context.Background(), sqlCmd)
 	if err != nil {
 		log.Println("User query failed", err)
@@ -1407,16 +1743,20 @@ func GetUsers(gqlFields []string) ([]UserInfo, error) {
 	for rows.Next() {
 		user := UserInfo{}
 		inputs := []interface{}{}
-		for _, gqlField := range gqlFields {
+		for _, fld := range sqlFields {
 			switch {
-			case "name" == gqlField:
-				inputs = append(inputs, &user.Name)
-			case "id" == gqlField:
+			case "first_name" == fld:
+				inputs = append(inputs, &user.FirstName)
+			case "last_name" == fld:
+				inputs = append(inputs, &user.LastName)
+			case "id" == fld:
 				inputs = append(inputs, &user.Id)
-			case "group" == gqlField:
+			case "group_id" == fld:
 				inputs = append(inputs, &user.Group)
+			case "has_auth_creds" == fld:
+				inputs = append(inputs, &user.HasAuthCreds)
 			default:
-				return users, errors.New(fmt.Sprintf("Unknown fundraiser user field: %s", gqlField))
+				return users, errors.New(fmt.Sprintf("Unknown fundraiser user db field: %s", fld))
 			}
 
 		}
@@ -1424,6 +1764,9 @@ func GetUsers(gqlFields []string) ([]UserInfo, error) {
 		if err != nil {
 			log.Println("Reading User row failed: ", err)
 			continue
+		}
+		if doWantFullNames {
+			user.Name = fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 		}
 		users = append(users, user)
 	}
@@ -1435,159 +1778,187 @@ func GetUsers(gqlFields []string) ([]UserInfo, error) {
 	return users, nil
 }
 
-// type CreateUserAppMeta struct {
-// 	FullName string `json:"full_name"`
-// }
-//
-// type CreateUser struct {
-// 	Email         string            `json:"email"`
-// 	EmailVerified bool              `json:"email_verified"`
-// 	AppMeta       CreateUserAppMeta `json:"app_metadata"`
-// 	Nickname      string            `json:"nickname"`
-// 	Connection    string            `json:"connection"`
-// 	VerifyEmail   bool              `json:"verify_email"`
-// 	Password      string            `json:"password"`
-// }
+// //////////////////////////////////////////////////////////////////////////
+func FrUsers2Sql(user UserInfo, isUpdate bool) ([]string, []string, []interface{}) {
+	values := []interface{}{}
+	sqlFields := []string{}
+	valIdxs := []string{}
+	valIdx := 1
 
-// ////////////////////////////////////////////////////////////////////////////
-// //
-// func createUser(user *UserInfo, jwt *string) error {
-//
-// 	param := CreateUser{
-// 		Email:         user.Id + "@bsatroop27.us",
-// 		EmailVerified: true,
-// 		AppMeta: CreateUserAppMeta{
-// 			FullName: user.Name,
-// 		},
-// 		Nickname:    user.Id,
-// 		Connection:  "Username-Password-Authentication",
-// 		VerifyEmail: false,
-// 		Password:    user.Password,
-// 	}
-//
-// 	paramInBytes, err := json.Marshal(param)
-// 	if err != nil {
-// 		return errors.New(fmt.Sprint("Failed to marshal user. Err:", err))
-// 	}
-//
-// 	url := fmt.Sprint(os.Getenv("AUTH0_BASE_URL"), "api/v2/users")
-// 	payload := strings.NewReader(string(paramInBytes))
-//
-// 	req, err := http.NewRequest("POST", url, payload)
-// 	if err != nil {
-// 		return errors.New(fmt.Sprint("Failed creating request. Err: ", err))
-// 	}
-// 	req.Header.Add("content-type", "application/json")
-// 	req.Header.Add("authorization", "Bearer "+*jwt)
-//
-// 	res, err := http.DefaultClient.Do(req)
-// 	if err != nil {
-// 		log.Println(res)
-// 		return errors.New(fmt.Sprint("Failed making request. Err: ", err))
-// 	}
-//
-// 	defer res.Body.Close()
-// 	body, _ := io.ReadAll(res.Body)
-// 	log.Println(string(body))
-// 	return nil
-// }
-//
-// ////////////////////////////////////////////////////////////////////////////
-// //
-// func AddUsers(ctx context.Context, users []UserInfo, jwt string) (bool, error) {
-// 	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
-// 	log.Println("Setting Users at: ", lastModifiedTime)
-//
-// 	if err := verifyAdminTokenFromCtx(ctx); err != nil {
-// 		return false, err
-// 	}
-//
-// 	existingUsers, err := GetUsers([]string{"id"})
-// 	if err != nil {
-// 		return false, err
-// 	}
-//
-// 	doesAlreadyExist := func(uid string) bool {
-// 		for _, existingUser := range existingUsers {
-// 			if existingUser.Id == uid {
-// 				return true
-// 			}
-// 		}
-// 		return false
-// 	}
-//
-// 	// Start Database Operations
-// 	trxn, err := Db.Begin(context.Background())
-// 	if err != nil {
-// 		return false, err
-// 	}
-//
-// 	for _, user := range users {
-// 		if doesAlreadyExist(user.Id) {
-// 			log.Println("User: ", user.Id, " already exists")
-// 			continue
-// 		} else {
-// 			log.Println("User: ", user.Id, " does not exists")
-// 		}
-// 		// log.Println("Deleting existing record if it exists")
-// 		// _, err = trxn.Exec(context.Background(), "delete from users where id = $1", user.Id)
-// 		// if err != nil {
-// 		// 	trxn.Rollback(context.Background())
-// 		// 	return false, err
-// 		// }
-//
-// 		sqlCmd := "insert into users(id, name, group_id) values ($1, $2, $3)"
-// 		log.Println("Adding user SqlCmd: ", sqlCmd)
-// 		_, err = trxn.Exec(context.Background(), sqlCmd, user.Id, user.Name, user.Group)
-// 		if err != nil {
-// 			trxn.Rollback(context.Background())
-// 			return false, err
-// 		}
-// 		existingUsers = append(existingUsers, user)
-// 	}
-//
-// 	sqlCmd2 := "UPDATE fundraiser_config SET last_modified_time=$1::timestamp WHERE last_modified_time=(SELECT last_modified_time FROM fundraiser_config LIMIT 1)"
-// 	_, err = trxn.Exec(context.Background(), sqlCmd2, lastModifiedTime)
-// 	if err != nil {
-// 		trxn.Rollback(context.Background())
-// 		return false, err
-// 	}
-//
-// 	log.Println("About to make a commitment")
-// 	err = trxn.Commit(context.Background())
-// 	if err != nil {
-// 		return false, err
-// 	}
-//
-// 	if len(jwt) <= 0 {
-// 		jwt = os.Getenv("AUTH0_ADMIN_TOKEN")
-// 	}
-//
-// 	// Now go back through looking for password and if present create the account
-// 	if len(jwt) > 0 {
-// 		for _, user := range users {
-// 			if len(user.Password) <= 0 {
-// 				continue
-// 			}
-// 			if err := createUser(&user, &jwt); err != nil {
-// 				log.Println("Failed creating user: ", err)
-// 			}
-// 		}
-// 	}
-//
-// 	return true, nil
-// }
+	if !isUpdate {
+		// These are fields we don't change when updating
 
-////////////////////////////////////////////////////////////////////////////
-//
+		if len(user.Id) != 0 {
+			sqlFields = append(sqlFields, "id")
+			values = append(values, user.Id)
+			valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+			valIdx++
+		}
+
+		if len(user.FirstName) != 0 {
+			sqlFields = append(sqlFields, "first_name")
+			values = append(values, user.FirstName)
+			valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+			valIdx++
+		}
+
+		if len(user.LastName) != 0 {
+			sqlFields = append(sqlFields, "last_name")
+			values = append(values, user.LastName)
+			valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+			valIdx++
+		}
+
+		// If we aren't updating then we are creating and so we always set these
+		sqlFields = append(sqlFields, "has_auth_creds")
+		values = append(values, false)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::bool", valIdx))
+		valIdx++
+
+		sqlFields = append(sqlFields, "created_time")
+		values = append(values, user.CreatedTime)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::timestamp", valIdx))
+		valIdx++
+	} else {
+		if nil != user.HasAuthCreds {
+			// Unfortunately hard to detect if this is set or not
+			sqlFields = append(sqlFields, "has_auth_creds")
+			values = append(values, *user.HasAuthCreds)
+			valIdxs = append(valIdxs, fmt.Sprintf("$%d::bool", valIdx))
+			valIdx++
+		}
+	}
+
+	if len(user.Group) != 0 {
+		sqlFields = append(sqlFields, "group_id")
+		values = append(values, user.Group)
+		valIdxs = append(valIdxs, fmt.Sprintf("$%d::string", valIdx))
+		valIdx++
+	}
+
+	// Always do timestamp
+	sqlFields = append(sqlFields, "last_modified_time")
+	values = append(values, user.LastModifiedTime)
+	valIdxs = append(valIdxs, fmt.Sprintf("$%d::timestamp", valIdx))
+	return sqlFields, valIdxs, values
+}
+
+// //////////////////////////////////////////////////////////////////////////
+func AddOrUpdateUsers(ctx context.Context, users []UserInfo) (bool, error) {
+	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
+	log.Println("Setting Users at: ", lastModifiedTime)
+
+	if len(users) == 0 {
+		return true, nil
+	}
+
+	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
+	existingUsers, err := GetUsers(GetUsersParams{GqlFields: []string{"id"}})
+	if err != nil {
+		return false, err
+	}
+
+	doesAlreadyExist := func(uid string) bool {
+		for _, existingUser := range existingUsers {
+			if existingUser.Id == uid {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Start Database Operations
+	trxn, err := Db.Begin(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	var isDirty = false
+	var isAddingUsers = false
+	for _, user := range users {
+		if len(user.Id) == 0 {
+			continue
+		}
+		user.LastModifiedTime = lastModifiedTime
+		if doesAlreadyExist(user.Id) {
+			log.Println("User: ", user.Id, " already exists so updating")
+
+			sqlFields, valIdxs, values := FrUsers2Sql(user, true)
+
+			updateSqlFlds := []string{}
+			for i, f := range sqlFields {
+				updateSqlFlds = append(updateSqlFlds, fmt.Sprintf("%s=%s", f, valIdxs[i]))
+			}
+
+			sqlCmd := fmt.Sprintf(
+				"UPDATE users SET %s WHERE id = '%s'",
+				strings.Join(updateSqlFlds, ","),
+				user.Id,
+			)
+
+			log.Println("Updating user SqlCmd: ", sqlCmd)
+			_, err = trxn.Exec(context.Background(), sqlCmd, values...)
+			if err != nil {
+				trxn.Rollback(context.Background())
+				return false, err
+			}
+		} else {
+			log.Println("User: ", user.Id, " does not exists")
+			user.CreatedTime = lastModifiedTime
+			sqlFields, valIdxs, values := FrUsers2Sql(user, false)
+
+			sqlCmd := fmt.Sprintf("insert into users(%s) values (%s)",
+				strings.Join(sqlFields, ","), strings.Join(valIdxs, ","))
+
+			log.Println("Adding user SqlCmd: ", sqlCmd)
+			_, err = trxn.Exec(context.Background(), sqlCmd, values...)
+			if err != nil {
+				trxn.Rollback(context.Background())
+				return false, err
+			}
+			isAddingUsers = true
+		}
+		existingUsers = append(existingUsers, user)
+		isDirty = true
+	}
+
+	if isDirty {
+		// Even though users aren't a part of the fundariser config table we still treat it like it is so
+		// trigger time update to force re-download of config data.
+		if err := updateFundraiserConfigWithTrxn(ctx, &trxn, FrConfigType{}); err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
+	}
+
+	log.Println("About to make a commitment")
+	err = trxn.Commit(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	if isAddingUsers {
+		CreateIssue(NewIssue{
+			Id:    "NEW_USER_REQ",
+			Title: "NEW_USER_REQ",
+			Body:  "New users have been added to the system",
+		})
+	}
+
+	return true, nil
+}
+
+// //////////////////////////////////////////////////////////////////////////
 type NewIssue struct {
 	Id    string `json:"id"`
 	Title string `json:"title"`
 	Body  string `json:"body"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 var newIssueGql = `
 mutation CreateIssue {
   createIssue(input: {
@@ -1605,8 +1976,7 @@ mutation CreateIssue {
 }
 `
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func CreateIssue(issue NewIssue) (bool, error) {
 	url := "https://api.github.com/graphql"
 
@@ -1648,8 +2018,7 @@ func CreateIssue(issue NewIssue) (bool, error) {
 	return true, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func SetSpreaders(orderId string, spreaders []string) (bool, error) {
 
 	if len(orderId) == 0 {
@@ -1670,7 +2039,7 @@ func SetSpreaders(orderId string, spreaders []string) (bool, error) {
 	}
 
 	if len(spreaders) > 0 {
-		sqlCmd := "insert into mulch_spreaders(order_id, spreaders) values ($1, $2::jsonb)"
+		sqlCmd := "insert into mulch_spreaders(order_id, spreaders) values ($1, $2)"
 		_, err = trxn.Exec(context.Background(), sqlCmd, orderId, spreaders)
 		if err != nil {
 			trxn.Rollback(context.Background())
@@ -1686,8 +2055,7 @@ func SetSpreaders(orderId string, spreaders []string) (bool, error) {
 	return true, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type AllocationItemType struct {
 	Uid                       string
 	BagsSold                  *int
@@ -1700,8 +2068,7 @@ type AllocationItemType struct {
 	AllocationsTotal          string
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func AllocItemType2Sql(item AllocationItemType) ([]string, []string, []interface{}) {
 	values := []interface{}{}
 	sqlFields := []string{}
@@ -1770,12 +2137,11 @@ func AllocItemType2Sql(item AllocationItemType) ([]string, []string, []interface
 	return sqlFields, valIdxs, values
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func SetFrCloseoutAllocations(ctx context.Context, allocations []AllocationItemType) (bool, error) {
 	log.Println("Setting Fr Closeout Allocations: ", allocations)
 
-	if err := verifyAdminTokenFromCtx(ctx); err != nil {
+	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
 		return false, err
 	}
 
@@ -1815,6 +2181,135 @@ func SetFrCloseoutAllocations(ctx context.Context, allocations []AllocationItemT
 		return false, err
 	}
 	return true, nil
+}
+
+const DROP_ORDER_TABLE_SQL = "drop table allocation_summary, mulch_delivery_timecards, mulch_orders, mulch_spreaders"
+const MULCH_ORDERS_TABLE_SQL = `
+CREATE TABLE mulch_orders (order_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), order_owner_id STRING, cash_amount_collected DECIMAL(13, 4),
+ check_amount_collected DECIMAL(13, 4), check_numbers STRING, amount_from_donations DECIMAL(13, 4), amount_from_purchases DECIMAL(13, 4),
+ will_collect_money_later BOOL, total_amount_collected DECIMAL(13,4), special_instructions STRING, is_verified BOOL, last_modified_time TIMESTAMP,
+ purchases JSONB, delivery_id INT, customer_addr1 STRING, customer_addr2 STRING, customer_zipcode INT, customer_city STRING,
+ customer_neighborhood STRING, known_addr_id UUID, customer_email STRING, customer_phone STRING, customer_name STRING, comments STRING)
+`
+const MULCH_SPREADERS_TABLE_SQL = "CREATE TABLE mulch_spreaders (order_id UUID PRIMARY KEY, spreaders STRING[])"
+const MULCH_DELIVERY_TIMECARD_TABLE_SQL = `CREATE TABLE mulch_delivery_timecards (uid STRING, delivery_id INT, last_modified_time ` +
+	`TIMESTAMP, time_in TIME, time_out TIME, time_total TIME, PRIMARY KEY (uid, delivery_id, time_in))`
+const ALLOCATION_SUMMARY_TABLE_SQL = `CREATE TABLE allocation_summary (uid STRING PRIMARY KEY, bags_sold INT, bags_spread DECIMAL(13,4), ` +
+	`delivery_minutes DECIMAL(13,4), total_donations DECIMAL(13,4), allocation_from_bags_sold DECIMAL(13,4), allocation_from_bags_spread DECIMAL(13,4), ` +
+	`allocation_from_delivery DECIMAL(13,4), allocation_total DECIMAL(13,4))`
+
+const DROP_USERS_TABLE_SQL = "drop table users"
+const USERS_TABLE_SQL = `CREATE TABLE users (id STRING, group_id STRING, first_name STRING, last_name STRING, ` +
+	`created_time TIMESTAMP, last_modified_time TIMESTAMP, has_auth_creds BOOL)`
+
+// //////////////////////////////////////////////////////////////////////////
+func resetOrderTables(ctx context.Context, trxn *pgx.Tx) error {
+	resetSqlCmds := [...]string{
+		DROP_ORDER_TABLE_SQL,
+		MULCH_ORDERS_TABLE_SQL,
+		MULCH_SPREADERS_TABLE_SQL,
+		MULCH_DELIVERY_TIMECARD_TABLE_SQL,
+		ALLOCATION_SUMMARY_TABLE_SQL,
+	}
+
+	for _, sqlCmd := range resetSqlCmds {
+		if _, err := (*trxn).Exec(context.Background(), sqlCmd); err != nil {
+			return err
+		}
+	}
+	return nil
+
+}
+
+// //////////////////////////////////////////////////////////////////////////
+func ResetFundraisingData(ctx context.Context, doResetUsers bool, doResetOrders bool) (bool, error) {
+	log.Println("Setting Fr Data: users: %t  doResetOrders: %t", doResetUsers, doResetOrders)
+
+	if !(doResetUsers || doResetOrders) {
+		// Was told not to reset anything
+		return true, nil
+	}
+	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
+	trxn, err := Db.Begin(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	if doResetUsers {
+		log.Println("Resetting users data ")
+		_, err = trxn.Exec(context.Background(), DROP_USERS_TABLE_SQL)
+		if err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
+		_, err = trxn.Exec(context.Background(), USERS_TABLE_SQL)
+		if err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
+	}
+
+	if doResetOrders {
+		log.Println("Resetting orders data")
+		err = resetOrderTables(ctx, &trxn)
+		if err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
+
+		frConfig := FrConfigType{FinalizationData: &FinalizationDataType{}, MulchDeliveryConfigs: &[]MulchDeliveryConfigType{}}
+		if err := updateFundraiserConfigWithTrxn(ctx, &trxn, frConfig); err != nil {
+			trxn.Rollback(context.Background())
+			return false, err
+		}
+	}
+
+	log.Println("About to make a commitment")
+	err = trxn.Commit(context.Background())
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// //////////////////////////////////////////////////////////////////////////
+type GeocodedAddress struct {
+	HouseNumber string `json: houseNumber`
+	Street      string `json: street`
+	Zipcode     int    `json: zipcode`
+	City        string `json: city`
+}
+
+// //////////////////////////////////////////////////////////////////////////
+func GetAddrFromLatLng(ctx context.Context, lat float64, lng float64) (*GeocodedAddress, error) {
+	log.Println("Reverse Geocoding lat/lng: (%.6f, %.6f)", lat, lng)
+	resolvedAddress, err := GEOCODER.ReverseGeocode(lat, lng)
+	if err != nil {
+		return nil, err
+	}
+	if resolvedAddress != nil {
+		log.Printf("Detailed address: %#v", resolvedAddress)
+		retVal := GeocodedAddress{
+			HouseNumber: resolvedAddress.HouseNumber,
+			Street:      resolvedAddress.Street,
+			City:        resolvedAddress.City,
+		}
+		zipcode, err := strconv.Atoi(resolvedAddress.Postcode)
+		if err != nil {
+			log.Printf("Failed to convert postcode: %s", resolvedAddress.Postcode)
+		} else {
+			retVal.Zipcode = zipcode
+		}
+
+		log.Printf("Address of (%.6f,%.6f) is %s", lat, lng, retVal)
+		return &retVal, nil
+	} else {
+		log.Println("got <nil> address")
+	}
+	return nil, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////
