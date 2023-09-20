@@ -14,7 +14,7 @@ var (
 	FrSchema graphql.Schema
 )
 
-////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////
 // Function for retrieving selected fields
 func getSelectedFields(selectionPath []string, resolveParams graphql.ResolveParams) []string {
 	fields := resolveParams.Info.FieldASTs
@@ -43,8 +43,7 @@ func getSelectedFields(selectionPath []string, resolveParams graphql.ResolvePara
 	return collect
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func init() {
 
 	queryFields := make(map[string]*graphql.Field)
@@ -932,20 +931,6 @@ func init() {
 			return GetAddrFromLatLng(p.Context, lat, lng)
 		},
 	}
-
-	// queryFields["testApi"] = &graphql.Field{
-	// 	Type:        graphql.Boolean,
-	// 	Description: "",
-	// 	Args: graphql.FieldConfigArgument{
-	// 		"param1": &graphql.ArgumentConfig{
-	// 			Description: "",
-	// 			Type:        graphql.NewNonNull(graphql.String),
-	// 		},
-	// 	},
-	// 	Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-	// 		return AdminTestApi(p.Context, p.Args["param1"].(string))
-	// 	},
-	// }
 
 	schemaConfig := graphql.SchemaConfig{
 		Query:    graphql.NewObject(graphql.ObjectConfig{Name: "Query", Fields: graphql.Fields(queryFields)}),

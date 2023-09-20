@@ -26,32 +26,25 @@ import (
 	"github.com/codingsince1985/geo-golang/openstreetmap"
 )
 
-////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////
 var (
 	dbMutex  sync.Mutex
 	Db       *pgxpool.Pool
 	GEOCODER = get_geocoder()
-	//mulchOrderFields bimap.BiMap
 )
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func get_geocoder() geo.Geocoder {
 	geocoder := openstreetmap.Geocoder()
-	// geocoder := chained.Geocoder(
-	// 	openstreetmap.Geocoder(),
-	// 	mapbox.Geocoder(os.Getenv("MAPBOX_API_KEY")),
-	// )
 
 	return geocoder
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func OpenDb() error {
 	if Db == nil {
 		dbMutex.Lock()
@@ -68,16 +61,14 @@ func OpenDb() error {
 	return nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func CloseDb() {
 	if Db != nil {
 		Db.Close()
 	}
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func makeDbConnection() (*pgxpool.Pool, error) {
 
 	dbId := os.Getenv("DB_ID")
@@ -102,8 +93,8 @@ func makeDbConnection() (*pgxpool.Pool, error) {
 	return conn, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
+// Structure to handle JWT Claims
 type T27FrClaims struct {
 	Email    string   `json:"email"`
 	Roles    []string `json:"groups"`
@@ -112,6 +103,8 @@ type T27FrClaims struct {
 	jwt.StandardClaims
 }
 
+// //////////////////////////////////////////////////////////////////////////
+// Returns true if JWT is admin
 func (claims *T27FrClaims) isAdmin() bool {
 	for _, role := range claims.Roles {
 		if strings.HasSuffix(role, "FrAdmins") {
@@ -121,16 +114,20 @@ func (claims *T27FrClaims) isAdmin() bool {
 	return false
 }
 
+// //////////////////////////////////////////////////////////////////////////
+// Returns the JWT user id
 func (claims *T27FrClaims) userId() string {
 	return claims.Id
 }
 
+// //////////////////////////////////////////////////////////////////////////
+//
+//	Returns true if JWT user id matches provided user id
 func (claims *T27FrClaims) doesUidMatch(uid string) bool {
 	return claims.userId() == uid
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func parseTokenClaimsFromCtx(ctx context.Context) (*T27FrClaims, error) {
 	if v := ctx.Value("T27FrAuthorization"); v != nil {
 
@@ -148,8 +145,7 @@ func parseTokenClaimsFromCtx(ctx context.Context) (*T27FrClaims, error) {
 	return nil, errors.New("Not Authorized: Invalid token")
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func VerifyAdminTokenFromCtx(ctx context.Context) error {
 	claims, err := parseTokenClaimsFromCtx(ctx)
 	if err != nil {
@@ -162,8 +158,7 @@ func VerifyAdminTokenFromCtx(ctx context.Context) error {
 	return nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func verifyUidAllowedFromCtx(ctx context.Context, uid string) error {
 	claims, err := parseTokenClaimsFromCtx(ctx)
 	if err != nil {
@@ -183,8 +178,7 @@ func verifyUidAllowedFromCtx(ctx context.Context, uid string) error {
 	return nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type OwnerIdSummaryType struct {
 	TotalDeliveryMinutes                int
 	TotalNumBagsSold                    int
@@ -199,8 +193,7 @@ type OwnerIdSummaryType struct {
 	AllocationsTotal                    string
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 	log.Println("Getting Summary for onwerId: ", ownerId)
 
@@ -344,30 +337,26 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 	}, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type TopSellerType struct {
 	Name                 string
 	TotalAmountCollected string
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type GroupSummaryType struct {
 	GroupId              string
 	TotalAmountCollected string
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type TroopSummaryType struct {
 	TotalAmountCollected string
 	GroupSummary         []GroupSummaryType
 	TopSellers           []TopSellerType
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
 	log.Println("Getting Troop Summary with this many top sellers: ", numTopSellers)
 
@@ -446,13 +435,13 @@ func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
 
 }
 
+// //////////////////////////////////////////////////////////////////////////
 type NeighborhoodSummaryType struct {
 	Neighborhood string `json:"neighborhood"`
 	NumOrders    int    `json:"numOrders"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetNeighborhoodSummary() ([]NeighborhoodSummaryType, error) {
 	log.Println("Getting Neighborhood Summary")
 
@@ -486,8 +475,7 @@ func GetNeighborhoodSummary() ([]NeighborhoodSummaryType, error) {
 	return results, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type CustomerType struct {
 	Name         string
 	Addr1        string
@@ -499,16 +487,14 @@ type CustomerType struct {
 	Neighborhood string
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type ProductsType struct {
 	ProductId     string `json:"productId"`
 	NumSold       int    `json:"numSold"`
 	AmountCharged string `json:"amountCharged,omitempty"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type MulchOrderType struct {
 	OrderId                   string
 	OwnerId                   string
@@ -529,8 +515,7 @@ type MulchOrderType struct {
 	Comments                  *string
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type MulchOrderMoneyCollectedType struct {
 	OwnerId                        string
 	AmountTotalCollected           *string
@@ -539,16 +524,14 @@ type MulchOrderMoneyCollectedType struct {
 	DeliveryId                     *int
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type GetMulchOrdersParams struct {
 	OwnerId    string
 	SpreaderId string
 	GqlFields  []string
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetMulchOrdersMoneyCollected(params GetMulchOrdersParams) []MulchOrderMoneyCollectedType {
 
 	////////////////////////////////////////////////////////////////////////////
@@ -633,8 +616,7 @@ func GetMulchOrdersMoneyCollected(params GetMulchOrdersParams) []MulchOrderMoney
 	return orders
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]string, []interface{}, string) {
 
 	sqlFields := []string{}
@@ -717,8 +699,7 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 	return sqlFields, inputs, joinSql
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 
 	// select order_id  from mulch_spreaders where 'fruser2' = any(spreaders);
@@ -777,15 +758,13 @@ func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 	return orders
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type GetMulchOrderParams struct {
 	OrderId   string
 	GqlFields []string
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetMulchOrder(params GetMulchOrderParams) MulchOrderType {
 	log.Println("Retrieving mulch order. OrderId: ", params.OrderId)
 
@@ -803,6 +782,7 @@ func GetMulchOrder(params GetMulchOrderParams) MulchOrderType {
 	return order
 }
 
+// //////////////////////////////////////////////////////////////////////////
 func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 	order.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
 	values := []interface{}{}
@@ -951,8 +931,7 @@ func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 	return sqlFields, valIdxs, values
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func CreateMulchOrder(ctx context.Context, order MulchOrderType) (string, error) {
 	log.Println("Creating Order: ", order)
 
@@ -996,8 +975,7 @@ func CreateMulchOrder(ctx context.Context, order MulchOrderType) (string, error)
 	return order.OrderId, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func UpdateMulchOrder(ctx context.Context, order MulchOrderType) (bool, error) {
 	log.Println("Updating Order: ", order)
 
@@ -1011,33 +989,6 @@ func UpdateMulchOrder(ctx context.Context, order MulchOrderType) (bool, error) {
 	if err := verifyUidAllowedFromCtx(ctx, order.OwnerId); err != nil {
 		return false, err
 	}
-
-	//This was actually only updating the specified fields not updating the optional ones so changing to
-	// delete existing record and adding new one
-	/*
-			sqlFields, valIdxs, values := OrderType2Sql(order)
-
-			updateSqlFields := []string{}
-			for i, sqlField := range sqlFields {
-				updateSqlFields = append(updateSqlFields, fmt.Sprintf("%s = %s", sqlField, valIdxs[i]))
-			}
-
-			updateSqlFields = updateSqlFields[1:] //Pop off Order id from the list
-			//values still has OrderId at pos 0 which is what we want so don't need to chop it off
-
-			sqlCmd := fmt.Sprintf("update mulch_orders set %s where order_id = $1", strings.Join(updateSqlFields, ","))
-
-			log.Println("Updating Order sqlCmd: ", sqlCmd)
-			res, err := Db.Exec(context.Background(), sqlCmd, values...)
-			if err != nil {
-				return false, err
-			}
-			if 1 != res.RowsAffected() {
-				return false, errors.New("There were 0 records updated")
-			}
-
-		        return true, nil
-	*/
 
 	sqlFields, valIdxs, values := OrderType2Sql(order)
 
@@ -1073,8 +1024,7 @@ func UpdateMulchOrder(ctx context.Context, order MulchOrderType) (bool, error) {
 
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func DeleteMulchOrder(ctx context.Context, orderId string) (bool, error) {
 	log.Println("Deleteing Order with order id: ", orderId)
 
@@ -1100,23 +1050,20 @@ func DeleteMulchOrder(ctx context.Context, orderId string) (bool, error) {
 	return true, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type MulchDeliveryConfigType struct {
 	Id                 int    `json:"id"`
 	Date               string `json:"date"`
 	NewOrderCutoffDate string `json:"newOrderCutoffDate"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type ProductPriceBreaks struct {
 	Gt        int    `json:"gt"`
 	UnitPrice string `json:"unitPrice"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type ProductType struct {
 	Id          string               `json:"id"`
 	Label       string               `json:"label"`
@@ -1125,8 +1072,7 @@ type ProductType struct {
 	PriceBreaks []ProductPriceBreaks `json:"priceBreaks"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type FinalizationDataType struct {
 	BankDeposited              string `json:"bankDeposited"`
 	MulchCost                  string `json:"mulchCost"`
@@ -1141,8 +1087,7 @@ type FinalizationDataType struct {
 	DeliveryEarningsPerMinute  string `json:"deliveryEarningsPerMinute"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type FrConfigType struct {
 	Kind                 string                     `json:"kind"`
 	Description          string                     `json:"description"`
@@ -1153,8 +1098,7 @@ type FrConfigType struct {
 	FinalizationData     *FinalizationDataType      `json:"finalizationData"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
 
 	log.Println("Retrieving Fundraiser Config")
@@ -1205,8 +1149,7 @@ func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
 	return frConfig, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func FrConfigType2Sql(frConfig FrConfigType) ([]string, []string, []interface{}) {
 	values := []interface{}{}
 	sqlFields := []string{}
@@ -1257,8 +1200,7 @@ func FrConfigType2Sql(frConfig FrConfigType) ([]string, []string, []interface{})
 	return sqlFields, valIdxs, values
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func setFundraiserConfigWithTrxn(ctx context.Context, trxn *pgx.Tx, frConfig FrConfigType) error {
 	frConfig.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
 	log.Println("Setting Fundraiding Config (with Trxn): ", frConfig)
@@ -1282,8 +1224,7 @@ func setFundraiserConfigWithTrxn(ctx context.Context, trxn *pgx.Tx, frConfig FrC
 	return nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, error) {
 	log.Println("Setting Fundraiding Config: ", frConfig)
 
@@ -1310,8 +1251,7 @@ func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, erro
 	return true, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func updateFundraiserConfigWithTrxn(ctx context.Context, trxn *pgx.Tx, frConfig FrConfigType) error {
 	frConfig.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
 	log.Println("Updating Fundraiding Config (with Trxn): ", frConfig)
@@ -1335,8 +1275,7 @@ func updateFundraiserConfigWithTrxn(ctx context.Context, trxn *pgx.Tx, frConfig 
 	return nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func UpdateFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, error) {
 	frConfig.LastModifiedTime = time.Now().UTC().Format(time.RFC3339)
 	log.Println("Updating Fundraiding Config")
@@ -1365,8 +1304,7 @@ func UpdateFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, e
 	return true, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type NeighborhoodInfo struct {
 	Name              string  `json: name`
 	Zipcode           *int    `json: zipcode`
@@ -1376,8 +1314,7 @@ type NeighborhoodInfo struct {
 	LastModifiedTime  string  `json:"lastModifiedTime"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetNeighborhoods(gqlFields []string) ([]NeighborhoodInfo, error) {
 
 	log.Println("Retrieving Fundraiser Neighborhoods")
@@ -1446,8 +1383,7 @@ func GetNeighborhoods(gqlFields []string) ([]NeighborhoodInfo, error) {
 	return neighborhoods, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func FrHoodType2Sql(hood NeighborhoodInfo, isUpdate bool) ([]string, []string, []interface{}) {
 	values := []interface{}{}
 	sqlFields := []string{}
@@ -1494,8 +1430,7 @@ func FrHoodType2Sql(hood NeighborhoodInfo, isUpdate bool) ([]string, []string, [
 	return sqlFields, valIdxs, values
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func AddOrUpdateNeighborhoods(ctx context.Context, hoods []NeighborhoodInfo) (bool, error) {
 	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
 	log.Println("Adding Neighborhoods at: ", lastModifiedTime)
@@ -1585,8 +1520,7 @@ func AddOrUpdateNeighborhoods(ctx context.Context, hoods []NeighborhoodInfo) (bo
 	return true, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type MulchTimecardType struct {
 	Id               string `json:"id"`
 	DeliveryId       int    `json:"deliveryId"`
@@ -1596,8 +1530,7 @@ type MulchTimecardType struct {
 	TimeTotal        string `json:"timeTotal"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func mulchTimecardGql2SqlMap(gqlFields []string, tc *MulchTimecardType) ([]string, []interface{}) {
 
 	sqlFields := []string{}
@@ -1631,8 +1564,7 @@ func mulchTimecardGql2SqlMap(gqlFields []string, tc *MulchTimecardType) ([]strin
 	return sqlFields, inputs
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetMulchTimecards(id string, deliveryId int, gqlFields []string) ([]MulchTimecardType, error) {
 	timecards := []MulchTimecardType{}
 
@@ -1690,8 +1622,7 @@ func GetMulchTimecards(id string, deliveryId int, gqlFields []string) ([]MulchTi
 	return timecards, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func SetMulchTimecards(ctx context.Context, timecards []MulchTimecardType) (bool, error) {
 	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
 	log.Println("Setting Timecards at: ", lastModifiedTime)
@@ -1736,8 +1667,7 @@ func SetMulchTimecards(ctx context.Context, timecards []MulchTimecardType) (bool
 	return true, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type UserInfo struct {
 	FirstName        string `json:"firstName"`
 	LastName         string `json:"lastName"`
@@ -1749,15 +1679,13 @@ type UserInfo struct {
 	CreatedTime      string `json:"createdTime,omitempty"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type GetUsersParams struct {
 	GqlFields                 []string
 	ShowUsersWithoutAuthCreds bool
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetUsers(params GetUsersParams) ([]UserInfo, error) {
 
 	log.Println("Retrieving Fundraiser Users")
@@ -1850,8 +1778,7 @@ func GetUsers(params GetUsersParams) ([]UserInfo, error) {
 	return users, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func FrUsers2Sql(user UserInfo, isUpdate bool) ([]string, []string, []interface{}) {
 	values := []interface{}{}
 	sqlFields := []string{}
@@ -1916,8 +1843,7 @@ func FrUsers2Sql(user UserInfo, isUpdate bool) ([]string, []string, []interface{
 	return sqlFields, valIdxs, values
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func AddOrUpdateUsers(ctx context.Context, users []UserInfo) (bool, error) {
 	lastModifiedTime := time.Now().UTC().Format(time.RFC3339)
 	log.Println("Setting Users at: ", lastModifiedTime)
@@ -2025,16 +1951,14 @@ func AddOrUpdateUsers(ctx context.Context, users []UserInfo) (bool, error) {
 	return true, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type NewIssue struct {
 	Id    string `json:"id"`
 	Title string `json:"title"`
 	Body  string `json:"body"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 var newIssueGql = `
 mutation CreateIssue {
   createIssue(input: {
@@ -2052,8 +1976,7 @@ mutation CreateIssue {
 }
 `
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func CreateIssue(issue NewIssue) (bool, error) {
 	url := "https://api.github.com/graphql"
 
@@ -2095,8 +2018,7 @@ func CreateIssue(issue NewIssue) (bool, error) {
 	return true, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func SetSpreaders(orderId string, spreaders []string) (bool, error) {
 
 	if len(orderId) == 0 {
@@ -2133,8 +2055,7 @@ func SetSpreaders(orderId string, spreaders []string) (bool, error) {
 	return true, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type AllocationItemType struct {
 	Uid                       string
 	BagsSold                  *int
@@ -2147,8 +2068,7 @@ type AllocationItemType struct {
 	AllocationsTotal          string
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func AllocItemType2Sql(item AllocationItemType) ([]string, []string, []interface{}) {
 	values := []interface{}{}
 	sqlFields := []string{}
@@ -2217,8 +2137,7 @@ func AllocItemType2Sql(item AllocationItemType) ([]string, []string, []interface
 	return sqlFields, valIdxs, values
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func SetFrCloseoutAllocations(ctx context.Context, allocations []AllocationItemType) (bool, error) {
 	log.Println("Setting Fr Closeout Allocations: ", allocations)
 
@@ -2283,8 +2202,7 @@ const DROP_USERS_TABLE_SQL = "drop table users"
 const USERS_TABLE_SQL = `CREATE TABLE users (id STRING, group_id STRING, first_name STRING, last_name STRING, ` +
 	`created_time TIMESTAMP, last_modified_time TIMESTAMP, has_auth_creds BOOL)`
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func resetOrderTables(ctx context.Context, trxn *pgx.Tx) error {
 	resetSqlCmds := [...]string{
 		DROP_ORDER_TABLE_SQL,
@@ -2303,8 +2221,7 @@ func resetOrderTables(ctx context.Context, trxn *pgx.Tx) error {
 
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func ResetFundraisingData(ctx context.Context, doResetUsers bool, doResetOrders bool) (bool, error) {
 	log.Println("Setting Fr Data: users: %t  doResetOrders: %t", doResetUsers, doResetOrders)
 
@@ -2358,8 +2275,7 @@ func ResetFundraisingData(ctx context.Context, doResetUsers bool, doResetOrders 
 	return true, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type GeocodedAddress struct {
 	HouseNumber string `json: houseNumber`
 	Street      string `json: street`
@@ -2367,8 +2283,7 @@ type GeocodedAddress struct {
 	City        string `json: city`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func GetAddrFromLatLng(ctx context.Context, lat float64, lng float64) (*GeocodedAddress, error) {
 	log.Println("Reverse Geocoding lat/lng: (%.6f, %.6f)", lat, lng)
 	resolvedAddress, err := GEOCODER.ReverseGeocode(lat, lng)

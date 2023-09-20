@@ -31,8 +31,7 @@ var (
 	setExists = struct{}{}
 )
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func loginKcAdmin(ctx context.Context) (*gocloak.GoCloak, string) {
 	client := gocloak.NewClient(os.Getenv("KEYCLOAK_URL"))
 	kcId := os.Getenv("KEYCLOAK_ID")
@@ -89,8 +88,7 @@ func createKcUsers(ctx context.Context, client *gocloak.GoCloak, token *string, 
 	}
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func getKcUsers(ctx context.Context, client *gocloak.GoCloak, token *string) map[string]struct{} {
 	users := make(map[string]struct{})
 	realm := os.Getenv("KEYCLOAK_REALM")
@@ -106,8 +104,7 @@ func getKcUsers(ctx context.Context, client *gocloak.GoCloak, token *string) map
 	return users
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 var GET_NON_AUTH_USERS_GQl = `{
   users(showOnlyUsersWithoutAuthCreds: true) {
     id
@@ -117,8 +114,7 @@ var GET_NON_AUTH_USERS_GQl = `{
   }
 }`
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type UserInfo struct {
 	FirstName   string `json:"firstName"`
 	LastName    string `json:"lastName"`
@@ -128,16 +124,14 @@ type UserInfo struct {
 	CreatedTime string `json:"createdTime,omitempty"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 type GetUsersResp struct {
 	Data struct {
 		Users []UserInfo `json:"users"`
 	} `json:"data"`
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func getUsersWithoutAuthCreds(ctx context.Context) []UserInfo {
 
 	rJSON, err := frgql.MakeGqlQuery(ctx, string(GET_NON_AUTH_USERS_GQl))
@@ -154,8 +148,7 @@ func getUsersWithoutAuthCreds(ctx context.Context) []UserInfo {
 	return resp.Data.Users
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func getUsersBackupDbEncKey() []byte {
 	// op item get r7gfsypfbqr3zlim3pqso2r4a4 --field password
 	cmd := exec.Command("op", "item", "get", "r7gfsypfbqr3zlim3pqso2r4a4", "--field", "password")
@@ -169,8 +162,7 @@ func getUsersBackupDbEncKey() []byte {
 	return enckey.Bytes()[:32]
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func generatePassword() string {
 	pw, err := password.Generate(24, 5, 5, false, false)
 	if err != nil {
@@ -190,8 +182,7 @@ func generatePassword() string {
 	return pw
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func encrypt(key, data []byte) ([]byte, error) {
 	blockCipher, err := aes.NewCipher(key)
 	if err != nil {
@@ -213,8 +204,7 @@ func encrypt(key, data []byte) ([]byte, error) {
 	return ciphertext, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func decrypt(key, data []byte) ([]byte, error) {
 	blockCipher, err := aes.NewCipher(key)
 	if err != nil {
@@ -236,8 +226,7 @@ func decrypt(key, data []byte) ([]byte, error) {
 	return plaintext, nil
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func readUsersFromBackupDb(dbdir *string) map[string]UserInfo {
 	users := make(map[string]UserInfo)
 
@@ -296,8 +285,7 @@ func readUsersFromBackupDb(dbdir *string) map[string]UserInfo {
 	return users
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func userInfo2BuDbBytes(users []UserInfo) []byte {
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
@@ -319,8 +307,7 @@ func userInfo2BuDbBytes(users []UserInfo) []byte {
 	return buf.Bytes()
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func saveUsersToBackupDb(dbdir *string, users []UserInfo) {
 	fnameUuid, err := uuid.NewRandom()
 	if err != nil {
@@ -350,8 +337,7 @@ func saveUsersToBackupDb(dbdir *string, users []UserInfo) {
 	defer f.Close()
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func saveFullUsersTo1Password(userMap map[string]UserInfo) {
 
 	// Convert to list of users so it can be sorted by creation time
@@ -382,8 +368,7 @@ mutation {
   }])
 }`
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func updateFrDbUsersWithAuthCreds(ctx context.Context, users *[]UserInfo) {
 	gqlUserEntries := []string{}
 
@@ -414,8 +399,7 @@ func updateFrDbUsersWithAuthCreds(ctx context.Context, users *[]UserInfo) {
 	log.Printf("JSON Resp:\n%s", rJSON)
 }
 
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func syncKcUsers(ctx context.Context, dbdir *string) {
 	nowTime := time.Now().UTC().Format(time.RFC3339)
 
@@ -490,65 +474,7 @@ func syncKcUsers(ctx context.Context, dbdir *string) {
 	updateFrDbUsersWithAuthCreds(ctx, &users)
 }
 
-//
-// ////////////////////////////////////////////////////////////////////////////
-// //
-// func xlsx2Gql(fnIn *string, fnOut *string, csvFnOut *string) {
-// 	f, err := excelize.OpenFile(*fnIn)
-// 	if err != nil {
-// 		log.Fatalln(err)
-// 	}
-// 	defer f.Close()
-// 	rows, err := f.GetRows("Final Roster")
-// 	if err != nil {
-// 		log.Fatalln(err)
-// 	}
-// 	users := []frgql.UserInfo{}
-// 	for idx, row := range rows {
-// 		log.Println(row)
-// 		if strings.HasPrefix(row[0], "New Scouts joined") || 0 == idx {
-// 			continue
-// 		}
-// 		userid := strings.ToLower(string(row[0][0]) + row[1])
-// 		fullName := fmt.Sprint(row[0], " ", row[1])
-// 		users = append(users, frgql.UserInfo{Name: fullName, Id: userid, Group: row[3]})
-// 	}
-// 	userInfo2Gql(&users, fnOut, csvFnOut)
-// }
-//
-// ////////////////////////////////////////////////////////////////////////////
-// //
-// func troopMaster2Gql(fnIn *string, fnOut *string, csvFnOut *string) {
-// 	// Troop Master is Last Name, First Name, Patrol
-//
-// 	csvFile, err := os.ReadFile(*fnIn)
-// 	if err != nil {
-// 		log.Panic("Failed opening file: ", *fnIn, " Err: ", err)
-// 	}
-// 	r := csv.NewReader(strings.NewReader(string(csvFile)))
-// 	// skip first line
-// 	if _, err := r.Read(); err != nil {
-// 		log.Fatal(err)
-// 	}
-//
-// 	recs, err := r.ReadAll()
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-//
-// 	users := []frgql.UserInfo{}
-//
-// 	for _, rec := range recs {
-// 		userid := strings.ToLower(string(rec[0][0]) + rec[1])
-// 		fullName := fmt.Sprint(rec[0], " ", rec[1])
-// 		users = append(users, frgql.UserInfo{Name: fullName, Id: userid, Group: rec[3]})
-// 	}
-// 	userInfo2Gql(&users, fnOut, csvFnOut)
-//
-// }
-
-////////////////////////////////////////////////////////////////////////////
-//
+// //////////////////////////////////////////////////////////////////////////
 func makeGqlReq(ctx context.Context, gqlFn *string) {
 
 	// Open File
@@ -585,9 +511,10 @@ func makeGqlReq(ctx context.Context, gqlFn *string) {
 	log.Printf("JSON Resp:\n%s", rJSON)
 }
 
-////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////
 // usage:
-//  go run main.go gql --in <gql filename>
+//
+//	go run main.go gql --in <gql filename>
 func main() {
 	ctx := context.Background()
 
