@@ -790,6 +790,19 @@ func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 	valIdx := 1
 	sqlFields := []string{}
 
+	// Sometimes orders come in with "0" for amount fields and we do
+	// not want to put those in the database so this strips them out
+	var strip_0_from_str = func(amount *string) {
+		if "0" == *amount {
+			values = append(values, nil)
+			valIdxs = append(valIdxs, fmt.Sprintf("$%d", valIdx))
+		} else {
+			values = append(values, *amount)
+			valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
+		}
+		valIdx++
+	}
+
 	// Do OrderID first because it is always there
 	sqlFields = append(sqlFields, "order_id")
 	values = append(values, order.OrderId)
@@ -827,33 +840,23 @@ func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 	}
 	if nil != order.AmountFromDonations {
 		sqlFields = append(sqlFields, "amount_from_donations")
-		values = append(values, *order.AmountFromDonations)
-		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
-		valIdx++
+		strip_0_from_str(order.AmountFromDonations)
 	}
 	if nil != order.AmountFromPurchases {
 		sqlFields = append(sqlFields, "amount_from_purchases")
-		values = append(values, *order.AmountFromPurchases)
-		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
-		valIdx++
+		strip_0_from_str(order.AmountFromPurchases)
 	}
 	if nil != order.AmountFromCashCollected {
 		sqlFields = append(sqlFields, "cash_amount_collected")
-		values = append(values, *order.AmountFromCashCollected)
-		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
-		valIdx++
+		strip_0_from_str(order.AmountFromCashCollected)
 	}
 	if nil != order.AmountFromChecksCollected {
 		sqlFields = append(sqlFields, "check_amount_collected")
-		values = append(values, *order.AmountFromChecksCollected)
-		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
-		valIdx++
+		strip_0_from_str(order.AmountFromChecksCollected)
 	}
 	if nil != order.AmountTotalCollected {
 		sqlFields = append(sqlFields, "total_amount_collected")
-		values = append(values, *order.AmountTotalCollected)
-		valIdxs = append(valIdxs, fmt.Sprintf("$%d::decimal", valIdx))
-		valIdx++
+		strip_0_from_str(order.AmountTotalCollected)
 	}
 	if nil != order.CheckNumbers {
 		sqlFields = append(sqlFields, "check_numbers")
