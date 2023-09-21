@@ -31,6 +31,12 @@ install:
 install-dev:
 		go get github.com/awslabs/aws-sam-local
 
+update-mods:
+	cd frgql && go get -u ./... && go mod tidy
+	cd cmd/lambda && go get -u ./... && go mod tidy
+	cd cmd/t27frcli && go get -u ./... && go mod tidy
+
+
 test:
 		go test ./... --cover
 
