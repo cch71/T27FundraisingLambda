@@ -3,6 +3,10 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 
+unexport AWS_DEFAULT_REGION
+unexport AWS_SECRET_ACCESS_KEY
+unexport AWS_ACCESS_KEY_ID
+
 MK_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 DIST_DIR := ${MK_DIR}/dist
 
