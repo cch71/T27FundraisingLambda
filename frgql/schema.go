@@ -489,9 +489,12 @@ func init() {
 	mulchDeliveryConfigType := graphql.NewObject(graphql.ObjectConfig{
 		Name: "MulchDeliveryConfigType",
 		Fields: graphql.Fields{
-			"id":                 &graphql.Field{Type: graphql.Int},
-			"date":               &graphql.Field{Type: graphql.String},
-			"newOrderCutoffDate": &graphql.Field{Type: graphql.String},
+			"id":                        &graphql.Field{Type: graphql.Int},
+			"timezone":                  &graphql.Field{Type: graphql.String},
+			"date":                      &graphql.Field{Type: graphql.String},
+			"dateAsEpoch":               &graphql.Field{Type: graphql.Int},
+			"newOrderCutoffDate":        &graphql.Field{Type: graphql.String},
+			"newOrderCutoffDateAsEpoch": &graphql.Field{Type: graphql.Int},
 		},
 	})
 	productPriceBreakConfigType := graphql.NewObject(graphql.ObjectConfig{
@@ -555,6 +558,7 @@ func init() {
 		Name: "MulchDeliveryInputConfigType",
 		Fields: graphql.InputObjectConfigFieldMap{
 			"id":                 &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"timezone":           &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"date":               &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"newOrderCutoffDate": &graphql.InputObjectFieldConfig{Type: graphql.String},
 		},

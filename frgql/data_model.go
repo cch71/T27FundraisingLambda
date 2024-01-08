@@ -1055,9 +1055,12 @@ func DeleteMulchOrder(ctx context.Context, orderId string) (bool, error) {
 
 // //////////////////////////////////////////////////////////////////////////
 type MulchDeliveryConfigType struct {
-	Id                 int    `json:"id"`
-	Date               string `json:"date"`
-	NewOrderCutoffDate string `json:"newOrderCutoffDate"`
+	Id                        int    `json:"id"`
+	Timezone                  string `json:"timezone"`
+	Date                      string `json:"date"`
+	DateAsEpoch               uint32 `json:"dateAsEpoch"`
+	NewOrderCutoffDate        string `json:"newOrderCutoffDate"`
+	NewOrderCutoffDateAsEpoch uint32 `json:"newOrderCutoffDateAsEpoch"`
 }
 
 // //////////////////////////////////////////////////////////////////////////
@@ -1228,10 +1231,60 @@ func setFundraiserConfigWithTrxn(ctx context.Context, trxn *pgx.Tx, frConfig FrC
 }
 
 // //////////////////////////////////////////////////////////////////////////
+func convertTzStrDateToEpoch(targetDate string, tzStr string) (uint32, error) {
+	// log.Println("Loading Timezone: ", tzStr)
+	loc, err := time.LoadLocation(tzStr)
+	if err != nil {
+		log.Println("Failed to load tz: ", tzStr, " ", err)
+		return 0, err
+	}
+	timeInTz, err := time.ParseInLocation("01/02/2006", targetDate, loc)
+	if err != nil {
+		log.Println("Failed to parse date: ", targetDate, " ", err)
+		return 0, err
+	}
+	timeInTz = timeInTz.Add(time.Hour * 24)
+	//log.Println("timeInTz: ", timeInTz, " timeInUtc: ",timeInTz.In(time.UTC))
+
+	return uint32(timeInTz.In(time.UTC).Unix()), nil
+}
+
+// //////////////////////////////////////////////////////////////////////////
+func calcMulchDeliveriesEpochs(frConfig *FrConfigType) error {
+	// We need to calculate the epoch times for the delivery dates based on
+	// provided timezone
+	if nil != frConfig.MulchDeliveryConfigs {
+		// log.Println("Theare are mulch delivery configs")
+		for idx, delivery := range *frConfig.MulchDeliveryConfigs {
+			// Find Delivery date epoch
+			epochTime, err := convertTzStrDateToEpoch(delivery.Date, delivery.Timezone)
+			if err != nil {
+				return err
+			}
+			// log.Println("Setting DataAsEpoch to: ", epochTime)
+			(*frConfig.MulchDeliveryConfigs)[idx].DateAsEpoch = epochTime
+
+			// Find Cutoff date epoch
+			epochTime, err = convertTzStrDateToEpoch(delivery.NewOrderCutoffDate, delivery.Timezone)
+			if err != nil {
+				return err
+			}
+			// log.Println("Setting NewOrderCutoffDateAsEpoch to: ", epochTime)
+			(*frConfig.MulchDeliveryConfigs)[idx].NewOrderCutoffDateAsEpoch = epochTime
+		}
+	}
+	return nil
+}
+
+// //////////////////////////////////////////////////////////////////////////
 func SetFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, error) {
-	log.Println("Setting Fundraiding Config: ", frConfig)
+	log.Println("Setting Fundraising Config: ", frConfig)
 
 	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
+	if err := calcMulchDeliveriesEpochs(&frConfig); err != nil {
 		return false, err
 	}
 
@@ -1284,6 +1337,10 @@ func UpdateFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, e
 	log.Println("Updating Fundraiding Config")
 
 	if err := VerifyAdminTokenFromCtx(ctx); err != nil {
+		return false, err
+	}
+
+	if err := calcMulchDeliveriesEpochs(&frConfig); err != nil {
 		return false, err
 	}
 
