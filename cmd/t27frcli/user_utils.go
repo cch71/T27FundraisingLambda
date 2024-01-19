@@ -9,7 +9,6 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -267,12 +266,12 @@ func readUsersFromBackupDb(dbdir *string) map[string]UserInfo {
 	// Get DB Backup Directory
 	log.Println("DB Backup Dir: ", *dbdir)
 
-	files, err := ioutil.ReadDir(*dbdir)
+	files, err := os.ReadDir(*dbdir)
 	if err != nil {
 		log.Fatal(err)
 	}
 	for _, file := range files {
-		if !file.IsDir() {
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".enc") {
 			fname := fmt.Sprintf("%s/%s", *dbdir, file.Name())
 			buDbFile2UserMap(fname)
 		}
