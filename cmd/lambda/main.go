@@ -38,7 +38,6 @@ func generateResp(body string, statusCode int) LambdaResponse {
 			"Access-Control-Allow-Origin": "*",
 		},
 	}
-
 }
 
 // //////////////////////////////////////////////////////////////////////////
@@ -48,10 +47,10 @@ func generateOkResp(body string) LambdaResponse {
 
 // //////////////////////////////////////////////////////////////////////////
 func HandleLambdaEvent(ctx context.Context, event LambdaRequest) (LambdaResponse, error) {
-	//if dbconn not already established then RwLock to go ahead and try once sync.Once
-	//check authorization
-	//run query
-	//return results
+	// if dbconn not already established then RwLock to go ahead and try once sync.Once
+	// check authorization
+	// run query
+	// return results
 	if err := frgql.OpenDb(); err != nil {
 		log.Println("Failed to initialize db:", err)
 		return generateResp("", http.StatusInternalServerError), err

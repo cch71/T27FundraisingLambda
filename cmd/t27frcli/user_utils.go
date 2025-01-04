@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Nerzal/gocloak/v12"
+	"github.com/Nerzal/gocloak/v13"
 	"github.com/cch71/T27FundraisingLambda/frgql"
 	"github.com/google/uuid"
 	"github.com/sethvargo/go-password/password"
@@ -40,7 +40,6 @@ func LoginKcAdmin(ctx context.Context) (*gocloak.GoCloak, string) {
 
 // ///////////////////////////////////////////////////////////////////////
 func createKcUser(ctx context.Context, client *gocloak.GoCloak, token *string, user UserInfo) {
-
 	log.Printf("Creating Kc Users:\n%v", user)
 
 	kcUser := gocloak.User{
@@ -127,7 +126,6 @@ type GetUsersResp struct {
 
 // //////////////////////////////////////////////////////////////////////////
 func getUsersWithoutAuthCreds(ctx context.Context) []UserInfo {
-
 	rJSON, err := frgql.MakeGqlQuery(ctx, string(GET_NON_AUTH_USERS_GQl))
 	if err != nil {
 		log.Panic("Get Users GraphQL Query Failed: ", err)
@@ -146,7 +144,7 @@ func getUsersWithoutAuthCreds(ctx context.Context) []UserInfo {
 func getUsersBackupDbEncKey() []byte {
 	// op item get r7gfsypfbqr3zlim3pqso2r4a4 --field password
 	cmd := exec.Command("op", "item", "get", "r7gfsypfbqr3zlim3pqso2r4a4", "--field", "password")
-	//cmd.Stdin = strings.NewReader("and old falcon")
+	// cmd.Stdin = strings.NewReader("and old falcon")
 	var enckey bytes.Buffer
 	cmd.Stdout = &enckey
 	err := cmd.Run()
@@ -333,7 +331,6 @@ func saveUsersToBackupDb(dbdir *string, users []UserInfo) {
 
 // //////////////////////////////////////////////////////////////////////////
 func saveFullUsersTo1Password(userMap map[string]UserInfo) {
-
 	// Convert to list of users so it can be sorted by creation time
 	users := []UserInfo{}
 	for _, user := range userMap {
@@ -352,7 +349,6 @@ func saveFullUsersTo1Password(userMap map[string]UserInfo) {
 	if err != nil {
 		log.Fatal("Failed running op cli", err)
 	}
-
 }
 
 var usersGql = `

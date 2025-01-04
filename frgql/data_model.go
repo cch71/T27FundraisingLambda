@@ -70,7 +70,6 @@ func CloseDb() {
 
 // //////////////////////////////////////////////////////////////////////////
 func makeDbConnection() (*pgxpool.Pool, error) {
-
 	dbId := os.Getenv("DB_ID")
 	dbToken := os.Getenv("DB_TOKEN")
 	dbHost := os.Getenv("DB_HOST")
@@ -135,14 +134,14 @@ func parseTokenClaimsFromCtx(ctx context.Context) (*T27FrClaims, error) {
 		token, _, _ := new(jwt.Parser).ParseUnverified(v.(string), &T27FrClaims{})
 
 		if claims, ok := token.Claims.(*T27FrClaims); ok {
-			//log.Println(claims)
+			// log.Println(claims)
 			return claims, nil
 		}
 	} else {
-		return nil, errors.New("Not Authorized: Required token not found")
+		return nil, errors.New("not authorized: Required token not found")
 	}
 
-	return nil, errors.New("Not Authorized: Invalid token")
+	return nil, errors.New("not authorized: Invalid token")
 }
 
 // //////////////////////////////////////////////////////////////////////////
@@ -153,7 +152,7 @@ func VerifyAdminTokenFromCtx(ctx context.Context) error {
 	}
 
 	if !claims.isAdmin() {
-		return errors.New("Not Authorized: Not an admin user")
+		return errors.New("not authorized: Not an admin user")
 	}
 	return nil
 }
@@ -171,9 +170,9 @@ func verifyUidAllowedFromCtx(ctx context.Context, uid string) error {
 	}
 
 	if !claims.doesUidMatch(uid) {
-		return errors.New(fmt.Sprintf(
-			"Not Authorized: User is not admin and id does not match. Asking: %s Found: %s",
-			uid, claims.userId()))
+		return fmt.Errorf(
+			"not authorized: User is not admin and id does not match. Asking: %s Found: %s",
+			uid, claims.userId())
 	}
 	return nil
 }
@@ -227,7 +226,7 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 		if totalCollectedAsStr == nil {
 			continue
 		}
-		//log.Println("TotalCollectedAsStr: ", *totalCollectedAsStr)
+		// log.Println("TotalCollectedAsStr: ", *totalCollectedAsStr)
 		total, err := decimal.NewFromString(*totalCollectedAsStr)
 		if err != nil {
 			return OwnerIdSummaryType{}, err
@@ -245,7 +244,7 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 
 		for _, item := range purchases {
 			// log.Println("ItemAmountChargedStr: ", item.AmountCharged)a
-			//ISSUE #108
+			// ISSUE #108
 			item.AmountCharged = strings.Replace(item.AmountCharged, ",", "", -1)
 			amt, err := decimal.NewFromString(item.AmountCharged)
 			if err != nil {
@@ -411,7 +410,7 @@ func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
 	}
 
 	sort.SliceStable(topSellers, func(r, l int) bool {
-		//I thought about options since total was parsed above but ulitmately felt like this was more memory
+		// I thought about options since total was parsed above but ulitmately felt like this was more memory
 		// efficient if not processor efficient
 		r_total, err := decimal.NewFromString(topSellers[r].TotalAmountCollected)
 		if err != nil {
@@ -432,7 +431,6 @@ func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
 		GroupSummary:         groupSummary,
 		TopSellers:           topSellers,
 	}, nil
-
 }
 
 // //////////////////////////////////////////////////////////////////////////
@@ -533,11 +531,9 @@ type GetMulchOrdersParams struct {
 
 // //////////////////////////////////////////////////////////////////////////
 func GetMulchOrdersMoneyCollected(params GetMulchOrdersParams) []MulchOrderMoneyCollectedType {
-
 	////////////////////////////////////////////////////////////////////////////
 	//
 	gql2sql := func(orderOutput *MulchOrderMoneyCollectedType) ([]string, []interface{}, string) {
-
 		sqlFields := []string{}
 		inputs := []interface{}{}
 		joinSql := ""
@@ -562,7 +558,6 @@ func GetMulchOrdersMoneyCollected(params GetMulchOrdersParams) []MulchOrderMoney
 			default:
 				log.Println("Do not know how to handle GraphQL Field: ", gqlField)
 			}
-
 		}
 		return sqlFields, inputs, joinSql
 	}
@@ -572,7 +567,6 @@ func GetMulchOrdersMoneyCollected(params GetMulchOrdersParams) []MulchOrderMoney
 
 	if 0 == len(params.OwnerId) {
 		log.Println("Retrieving mulch orders money collected.")
-
 	} else {
 		log.Println("Retrieving mulch orders money collected. OwnerId: ", params.OwnerId)
 	}
@@ -618,7 +612,6 @@ func GetMulchOrdersMoneyCollected(params GetMulchOrdersParams) []MulchOrderMoney
 
 // //////////////////////////////////////////////////////////////////////////
 func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]string, []interface{}, string) {
-
 	sqlFields := []string{}
 	inputs := []interface{}{}
 	joinSql := ""
@@ -694,24 +687,21 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 		default:
 			log.Println("Do not know how to handle GraphQL Field: ", gqlField)
 		}
-
 	}
 	return sqlFields, inputs, joinSql
 }
 
 // //////////////////////////////////////////////////////////////////////////
 func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
-
 	// select order_id  from mulch_spreaders where 'fruser2' = any(spreaders);
-	//select order_owner_id, spreaders from mulch_orders left join mulch_spreaders on mulch_orders.order_id = mulch_spreaders.order_id
-	//where mulch_orders.order_id = '2a166081-787f-4ff6-9477-31b21b6ca2f7';
+	// select order_owner_id, spreaders from mulch_orders left join mulch_spreaders on mulch_orders.order_id = mulch_spreaders.order_id
+	// where mulch_orders.order_id = '2a166081-787f-4ff6-9477-31b21b6ca2f7';
 
 	order := MulchOrderType{}
 	sqlFields, _, joinSql := mulchOrderGql2SqlMap(params.GqlFields, &order)
 
 	if 0 == len(params.OwnerId) {
 		log.Println("Retrieving mulch orders.")
-
 	} else {
 		log.Println("Retrieving mulch orders. OwnerId: ", params.OwnerId)
 	}
@@ -792,7 +782,7 @@ func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 
 	// Sometimes orders come in with "0" for amount fields and we do
 	// not want to put those in the database so this strips them out
-	var strip_0_from_str = func(amount *string) {
+	strip_0_from_str := func(amount *string) {
 		if "0" == *amount {
 			values = append(values, nil)
 			valIdxs = append(valIdxs, fmt.Sprintf("$%d", valIdx))
@@ -1024,7 +1014,6 @@ func UpdateMulchOrder(ctx context.Context, order MulchOrderType) (bool, error) {
 		return false, err
 	}
 	return true, nil
-
 }
 
 // //////////////////////////////////////////////////////////////////////////
@@ -1106,7 +1095,6 @@ type FrConfigType struct {
 
 // //////////////////////////////////////////////////////////////////////////
 func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
-
 	log.Println("Retrieving Fundraiser Config")
 
 	frConfig := FrConfigType{}
@@ -1138,11 +1126,10 @@ func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
 			sqlFields = append(sqlFields, "is_locked")
 		case "users" == gqlField:
 		case "neighborhoods" == gqlField:
-			//Skipping because it is handled seperately
+			// Skipping because it is handled seperately
 		default:
 			return frConfig, errors.New(fmt.Sprintf("Unknown fundraiser config field: %s", gqlField))
 		}
-
 	}
 
 	sqlCmd := fmt.Sprintf("select %s from fundraiser_config", strings.Join(sqlFields, ","))
@@ -1244,7 +1231,7 @@ func convertTzStrDateToEpoch(targetDate string, tzStr string) (uint32, error) {
 		return 0, err
 	}
 	timeInTz = timeInTz.Add(time.Hour * 24)
-	//log.Println("timeInTz: ", timeInTz, " timeInUtc: ",timeInTz.In(time.UTC))
+	// log.Println("timeInTz: ", timeInTz, " timeInUtc: ",timeInTz.In(time.UTC))
 
 	return uint32(timeInTz.In(time.UTC).Unix()), nil
 }
@@ -1366,17 +1353,16 @@ func UpdateFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, e
 
 // //////////////////////////////////////////////////////////////////////////
 type NeighborhoodInfo struct {
-	Name              string  `json: name`
-	Zipcode           *int    `json: zipcode`
-	City              *string `json: city`
-	IsVisible         *bool   `json: is_visible`
+	Name              string  `json:"name"`
+	Zipcode           *int    `json:"zipcode"`
+	City              *string `json:"city"`
+	IsVisible         *bool   `json:"is_visible"`
 	DistributionPoint *string `json:"distributionPoint"`
 	LastModifiedTime  string  `json:"lastModifiedTime"`
 }
 
 // //////////////////////////////////////////////////////////////////////////
 func GetNeighborhoods(gqlFields []string) ([]NeighborhoodInfo, error) {
-
 	log.Println("Retrieving Fundraiser Neighborhoods")
 
 	neighborhoods := []NeighborhoodInfo{}
@@ -1395,9 +1381,8 @@ func GetNeighborhoods(gqlFields []string) ([]NeighborhoodInfo, error) {
 		case "distributionPoint" == gqlField:
 			sqlFields = append(sqlFields, "dist_pt")
 		default:
-			return neighborhoods, errors.New(fmt.Sprintf("Unknown fundraiser neighborhood field: %s", gqlField))
+			return neighborhoods, fmt.Errorf("unknown fundraiser neighborhood field: %s", gqlField)
 		}
-
 	}
 
 	sqlCmd := fmt.Sprintf("select %s from neighborhoods", strings.Join(sqlFields, ","))
@@ -1424,9 +1409,8 @@ func GetNeighborhoods(gqlFields []string) ([]NeighborhoodInfo, error) {
 			case "distributionPoint" == gqlField:
 				inputs = append(inputs, &hood.DistributionPoint)
 			default:
-				return neighborhoods, errors.New(fmt.Sprintf("Unknown fundraiser neighborhood field: %s", gqlField))
+				return neighborhoods, fmt.Errorf("unknown fundraiser neighborhood field: %s", gqlField)
 			}
-
 		}
 		err = rows.Scan(inputs...)
 		if err != nil {
@@ -1592,7 +1576,6 @@ type MulchTimecardType struct {
 
 // //////////////////////////////////////////////////////////////////////////
 func mulchTimecardGql2SqlMap(gqlFields []string, tc *MulchTimecardType) ([]string, []interface{}) {
-
 	sqlFields := []string{}
 	inputs := []interface{}{}
 
@@ -1619,7 +1602,6 @@ func mulchTimecardGql2SqlMap(gqlFields []string, tc *MulchTimecardType) ([]strin
 		default:
 			log.Println("Do not know how to handle GraphQL Field: ", gqlField)
 		}
-
 	}
 	return sqlFields, inputs
 }
@@ -1628,7 +1610,7 @@ func mulchTimecardGql2SqlMap(gqlFields []string, tc *MulchTimecardType) ([]strin
 func GetMulchTimecards(id string, deliveryId int, gqlFields []string) ([]MulchTimecardType, error) {
 	timecards := []MulchTimecardType{}
 
-	tc := MulchTimecardType{} //This is pretty much throw away probably should change to nil
+	tc := MulchTimecardType{} // This is pretty much throw away probably should change to nil
 	sqlFields, _ := mulchTimecardGql2SqlMap(gqlFields, &tc)
 
 	sqlCmd := fmt.Sprintf("SELECT %s FROM mulch_delivery_timecards", strings.Join(sqlFields, ","))
@@ -1656,7 +1638,6 @@ func GetMulchTimecards(id string, deliveryId int, gqlFields []string) ([]MulchTi
 
 	sqlCmd = fmt.Sprintf("%s %s", sqlCmd, strings.Join(sqlFields, " AND "))
 	rows, err := Db.Query(context.Background(), sqlCmd, values...)
-
 	if err != nil {
 		log.Println("Timecard query Failed", err)
 		return timecards, nil
@@ -1747,7 +1728,6 @@ type GetUsersParams struct {
 
 // //////////////////////////////////////////////////////////////////////////
 func GetUsers(params GetUsersParams) ([]UserInfo, error) {
-
 	log.Println("Retrieving Fundraiser Users")
 
 	users := []UserInfo{}
@@ -1774,10 +1754,10 @@ func GetUsers(params GetUsersParams) ([]UserInfo, error) {
 			case "hasAuthCreds" == gqlField:
 				sqlFieldSet["has_auth_creds"] = exists
 			default:
-				return sqlFields, false, errors.New(fmt.Sprintf("Unknown fundraiser user field: %s", gqlField))
+				return sqlFields, false, fmt.Errorf("unknown fundraiser user field: %s", gqlField)
 			}
 		}
-		for k, _ := range sqlFieldSet {
+		for k := range sqlFieldSet {
 			sqlFields = append(sqlFields, k)
 		}
 		return sqlFields, doWantFullNames, nil
@@ -1816,9 +1796,8 @@ func GetUsers(params GetUsersParams) ([]UserInfo, error) {
 			case "has_auth_creds" == fld:
 				inputs = append(inputs, &user.HasAuthCreds)
 			default:
-				return users, errors.New(fmt.Sprintf("Unknown fundraiser user db field: %s", fld))
+				return users, fmt.Errorf("unknown fundraiser user db field: %s", fld)
 			}
-
 		}
 		err = rows.Scan(inputs...)
 		if err != nil {
@@ -1936,8 +1915,8 @@ func AddOrUpdateUsers(ctx context.Context, users []UserInfo) (bool, error) {
 		return false, err
 	}
 
-	var isDirty = false
-	var isAddingUsers = false
+	isDirty := false
+	isAddingUsers := false
 	for _, user := range users {
 		if len(user.Id) == 0 {
 			continue
@@ -2080,7 +2059,6 @@ func CreateIssue(issue NewIssue) (bool, error) {
 
 // //////////////////////////////////////////////////////////////////////////
 func SetSpreaders(orderId string, spreaders []string) (bool, error) {
-
 	if len(orderId) == 0 {
 		return false, errors.New("orderId must be provided")
 	}
@@ -2243,27 +2221,35 @@ func SetFrCloseoutAllocations(ctx context.Context, allocations []AllocationItemT
 	return true, nil
 }
 
-const DROP_ORDER_TABLE_SQL = "drop table allocation_summary, mulch_delivery_timecards, mulch_orders, mulch_spreaders"
-const MULCH_ORDERS_TABLE_SQL = `
+const (
+	DROP_ORDER_TABLE_SQL   = "drop table allocation_summary, mulch_delivery_timecards, mulch_orders, mulch_spreaders"
+	MULCH_ORDERS_TABLE_SQL = `
 CREATE TABLE mulch_orders (order_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), order_owner_id STRING, cash_amount_collected DECIMAL(13, 4),
  check_amount_collected DECIMAL(13, 4), check_numbers STRING, amount_from_donations DECIMAL(13, 4), amount_from_purchases DECIMAL(13, 4),
  will_collect_money_later BOOL, total_amount_collected DECIMAL(13,4), special_instructions STRING, is_verified BOOL, last_modified_time TIMESTAMP,
  purchases JSONB, delivery_id INT, customer_addr1 STRING, customer_addr2 STRING, customer_zipcode INT, customer_city STRING,
  customer_neighborhood STRING, known_addr_id UUID, customer_email STRING, customer_phone STRING, customer_name STRING, comments STRING)
 `
-const MULCH_SPREADERS_TABLE_SQL = "CREATE TABLE mulch_spreaders (order_id UUID PRIMARY KEY, spreaders STRING[])"
-const MULCH_DELIVERY_TIMECARD_TABLE_SQL = `CREATE TABLE mulch_delivery_timecards (uid STRING, delivery_id INT, last_modified_time ` +
-	`TIMESTAMP, time_in TIME, time_out TIME, time_total TIME, PRIMARY KEY (uid, delivery_id, time_in))`
+)
+
+const (
+	MULCH_SPREADERS_TABLE_SQL         = "CREATE TABLE mulch_spreaders (order_id UUID PRIMARY KEY, spreaders STRING[])"
+	MULCH_DELIVERY_TIMECARD_TABLE_SQL = `CREATE TABLE mulch_delivery_timecards (uid STRING, delivery_id INT, last_modified_time ` +
+		`TIMESTAMP, time_in TIME, time_out TIME, time_total TIME, PRIMARY KEY (uid, delivery_id, time_in))`
+)
+
 const ALLOCATION_SUMMARY_TABLE_SQL = `CREATE TABLE allocation_summary (uid STRING PRIMARY KEY, bags_sold INT, bags_spread DECIMAL(13,4), ` +
 	`delivery_minutes DECIMAL(13,4), total_donations DECIMAL(13,4), allocation_from_bags_sold DECIMAL(13,4), allocation_from_bags_spread DECIMAL(13,4), ` +
 	`allocation_from_delivery DECIMAL(13,4), allocation_total DECIMAL(13,4))`
 
-const DROP_USERS_TABLE_SQL = "drop table users"
-const USERS_TABLE_SQL = `CREATE TABLE users (id STRING, group_id STRING, first_name STRING, last_name STRING, ` +
-	`created_time TIMESTAMP, last_modified_time TIMESTAMP, has_auth_creds BOOL)`
+const (
+	DROP_USERS_TABLE_SQL = "drop table users"
+	USERS_TABLE_SQL      = `CREATE TABLE users (id STRING, group_id STRING, first_name STRING, last_name STRING, ` +
+		`created_time TIMESTAMP, last_modified_time TIMESTAMP, has_auth_creds BOOL)`
+)
 
 // //////////////////////////////////////////////////////////////////////////
-func resetOrderTables(ctx context.Context, trxn *pgx.Tx) error {
+func resetOrderTables(_ context.Context, trxn *pgx.Tx) error {
 	resetSqlCmds := [...]string{
 		DROP_ORDER_TABLE_SQL,
 		MULCH_ORDERS_TABLE_SQL,
@@ -2278,12 +2264,11 @@ func resetOrderTables(ctx context.Context, trxn *pgx.Tx) error {
 		}
 	}
 	return nil
-
 }
 
 // //////////////////////////////////////////////////////////////////////////
 func ResetFundraisingData(ctx context.Context, doResetUsers bool, doResetOrders bool) (bool, error) {
-	log.Println("Setting Fr Data: users: %t  doResetOrders: %t", doResetUsers, doResetOrders)
+	log.Printf("Setting Fr Data: users: %t  doResetOrders: %t", doResetUsers, doResetOrders)
 
 	if !(doResetUsers || doResetOrders) {
 		// Was told not to reset anything
@@ -2337,15 +2322,15 @@ func ResetFundraisingData(ctx context.Context, doResetUsers bool, doResetOrders 
 
 // //////////////////////////////////////////////////////////////////////////
 type GeocodedAddress struct {
-	HouseNumber string `json: houseNumber`
-	Street      string `json: street`
-	Zipcode     int    `json: zipcode`
-	City        string `json: city`
+	HouseNumber string `json:"houseNumber"`
+	Street      string `json:"street"`
+	Zipcode     int    `json:"zipcode"`
+	City        string `json:"city"`
 }
 
 // //////////////////////////////////////////////////////////////////////////
 func GetAddrFromLatLng(ctx context.Context, lat float64, lng float64) (*GeocodedAddress, error) {
-	log.Println("Reverse Geocoding lat/lng: (%.6f, %.6f)", lat, lng)
+	log.Printf("Reverse Geocoding lat/lng: (%.6f, %.6f)", lat, lng)
 	resolvedAddress, err := GEOCODER.ReverseGeocode(lat, lng)
 	if err != nil {
 		return nil, err
@@ -2364,7 +2349,7 @@ func GetAddrFromLatLng(ctx context.Context, lat float64, lng float64) (*Geocoded
 			retVal.Zipcode = zipcode
 		}
 
-		log.Printf("Address of (%.6f,%.6f) is %s", lat, lng, retVal)
+		log.Printf("Address of (%.6f,%.6f) is %v", lat, lng, retVal)
 		return &retVal, nil
 	} else {
 		log.Println("got <nil> address")
