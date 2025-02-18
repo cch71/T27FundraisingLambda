@@ -18,12 +18,15 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
 	"github.com/codingsince1985/geo-golang"
 	"github.com/codingsince1985/geo-golang/openstreetmap"
+
+	"github.com/doug-martin/goqu/v9"
+	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 )
 
 // //////////////////////////////////////////////////////////////////////////
@@ -84,7 +87,7 @@ func makeDbConnection() (*pgxpool.Pool, error) {
 	cnxnUri := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", dbId, dbToken, dbHost, dbPort, dbParams)
 	// Attempt to connect
 	// log.Println("\n\nCnxn String: ", cnxnUri, "\n")
-	conn, err := pgxpool.Connect(context.Background(), cnxnUri)
+	conn, err := pgxpool.New(context.Background(), cnxnUri)
 	if err != nil {
 		return nil, err
 	}
@@ -524,9 +527,10 @@ type MulchOrderMoneyCollectedType struct {
 
 // //////////////////////////////////////////////////////////////////////////
 type GetMulchOrdersParams struct {
-	OwnerId    string
-	SpreaderId string
-	GqlFields  []string
+	OwnerId               string
+	SpreaderId            string
+	DoGetSpreadOrdersOnly bool
+	GqlFields             []string
 }
 
 // //////////////////////////////////////////////////////////////////////////
@@ -539,24 +543,24 @@ func GetMulchOrdersMoneyCollected(params GetMulchOrdersParams) []MulchOrderMoney
 		joinSql := ""
 		for _, gqlField := range params.GqlFields {
 			// log.Println(gqlField)
-			switch {
-			case gqlField == "ownerId":
+			switch gqlField {
+			case "ownerId":
 				inputs = append(inputs, &orderOutput.OwnerId)
 				sqlFields = append(sqlFields, "order_owner_id")
-			case gqlField == "deliveryId":
+			case "deliveryId":
 				inputs = append(inputs, &orderOutput.DeliveryId)
 				sqlFields = append(sqlFields, "delivery_id")
-			case gqlField == "amountTotalCollected":
+			case "amountTotalCollected":
 				inputs = append(inputs, &orderOutput.AmountTotalCollected)
 				sqlFields = append(sqlFields, "SUM(total_amount_collected)::string")
-			case gqlField == "amountTotalFromCashCollected":
+			case "amountTotalFromCashCollected":
 				inputs = append(inputs, &orderOutput.AmountTotalFromCashCollected)
 				sqlFields = append(sqlFields, "SUM(cash_amount_collected)::string")
-			case gqlField == "amountTotalFromChecksCollected":
+			case "amountTotalFromChecksCollected":
 				inputs = append(inputs, &orderOutput.AmountTotalFromChecksCollected)
 				sqlFields = append(sqlFields, "SUM(check_amount_collected)::string")
 			default:
-				log.Println("Do not know how to handle GraphQL Field: ", gqlField)
+				// log.Println("Do not know how to handle mulch orders money collected GraphQL Field: ", gqlField)
 			}
 		}
 		return sqlFields, inputs, joinSql
@@ -611,63 +615,67 @@ func GetMulchOrdersMoneyCollected(params GetMulchOrdersParams) []MulchOrderMoney
 }
 
 // //////////////////////////////////////////////////////////////////////////
-func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]string, []interface{}, string) {
-	sqlFields := []string{}
+func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType, queryBuilder *goqu.SelectDataset) (*goqu.SelectDataset, []interface{}) {
+	sqlFields := []interface{}{}
 	inputs := []interface{}{}
-	joinSql := ""
 	for _, gqlField := range gqlFields {
 		// log.Println(gqlField)
-		switch {
-		case gqlField == "orderId":
+		switch gqlField {
+		case "orderId":
 			inputs = append(inputs, &orderOutput.OrderId)
-			sqlFields = append(sqlFields, "mulch_orders.order_id")
-		case gqlField == "ownerId":
+			sqlFields = append(sqlFields, goqu.L("mulch_orders.order_id"))
+		case "ownerId":
 			inputs = append(inputs, &orderOutput.OwnerId)
 			sqlFields = append(sqlFields, "order_owner_id")
-		case gqlField == "amountTotalCollected":
+		case "amountTotalCollected":
 			inputs = append(inputs, &orderOutput.AmountTotalCollected)
-			sqlFields = append(sqlFields, "total_amount_collected::string")
-		case gqlField == "purchases":
+			sqlFields = append(sqlFields, goqu.L("total_amount_collected::string"))
+		case "purchases":
 			inputs = append(inputs, &orderOutput.Purchases)
-			sqlFields = append(sqlFields, "purchases::jsonb")
-		case gqlField == "last_modified_time":
+			sqlFields = append(sqlFields, goqu.L("purchases::jsonb"))
+		case "last_modified_time":
 			inputs = append(inputs, &orderOutput.LastModifiedTime)
 			sqlFields = append(sqlFields, "last_modified_time")
-		case gqlField == "comments":
+		case "comments":
 			inputs = append(inputs, &orderOutput.Comments)
 			sqlFields = append(sqlFields, "comments")
-		case gqlField == "specialInstructions":
+		case "specialInstructions":
 			inputs = append(inputs, &orderOutput.SpecialInstructions)
 			sqlFields = append(sqlFields, "special_instructions")
-		case gqlField == "amountFromDonations":
+		case "amountFromDonations":
 			inputs = append(inputs, &orderOutput.AmountFromDonations)
-			sqlFields = append(sqlFields, "amount_from_donations::string")
-		case gqlField == "amountFromPurchases":
+			sqlFields = append(sqlFields, goqu.L("amount_from_donations::string"))
+		case "amountFromPurchases":
 			inputs = append(inputs, &orderOutput.AmountFromPurchases)
-			sqlFields = append(sqlFields, "amount_from_purchases::string")
-		case gqlField == "amountFromCashCollected":
+			sqlFields = append(sqlFields, goqu.L("amount_from_purchases::string"))
+		case "amountFromCashCollected":
 			inputs = append(inputs, &orderOutput.AmountFromCashCollected)
-			sqlFields = append(sqlFields, "cash_amount_collected::string")
-		case gqlField == "amountFromChecksCollected":
+			sqlFields = append(sqlFields, goqu.L("cash_amount_collected::string"))
+		case "amountFromChecksCollected":
 			inputs = append(inputs, &orderOutput.AmountFromChecksCollected)
-			sqlFields = append(sqlFields, "check_amount_collected::string")
-		case gqlField == "checkNumbers":
+			sqlFields = append(sqlFields, goqu.L("check_amount_collected::string"))
+		case "checkNumbers":
 			inputs = append(inputs, &orderOutput.CheckNumbers)
-			sqlFields = append(sqlFields, "check_numbers::string")
-		case gqlField == "deliveryId":
+			sqlFields = append(sqlFields, goqu.L("check_numbers::string"))
+		case "deliveryId":
 			inputs = append(inputs, &orderOutput.DeliveryId)
 			sqlFields = append(sqlFields, "delivery_id")
-		case gqlField == "willCollectMoneyLater":
+		case "willCollectMoneyLater":
 			inputs = append(inputs, &orderOutput.WillCollectMoneyLater)
 			sqlFields = append(sqlFields, "will_collect_money_later")
-		case gqlField == "isVerified":
+		case "isVerified":
 			inputs = append(inputs, &orderOutput.IsVerified)
 			sqlFields = append(sqlFields, "is_verified")
-		case gqlField == "spreaders":
+		case "spreaders":
 			inputs = append(inputs, &orderOutput.Spreaders)
 			sqlFields = append(sqlFields, "spreaders")
-			joinSql = "LEFT JOIN mulch_spreaders ON mulch_orders.order_id = mulch_spreaders.order_id"
-		case gqlField == "customer":
+			if queryBuilder != nil {
+				queryBuilder = queryBuilder.LeftJoin(goqu.T("mulch_spreaders"),
+					goqu.On(goqu.Ex{"mulch_orders.order_id": goqu.I("mulch_spreaders.order_id")}),
+				)
+				// joinSql = "LEFT JOIN mulch_spreaders ON mulch_orders.order_id = mulch_spreaders.order_id"
+			}
+		case "customer":
 			inputs = append(inputs, &orderOutput.Customer.Name)
 			sqlFields = append(sqlFields, "customer_name")
 			inputs = append(inputs, &orderOutput.Customer.Addr1)
@@ -685,41 +693,42 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType) ([]st
 			inputs = append(inputs, &orderOutput.Customer.Neighborhood)
 			sqlFields = append(sqlFields, "customer_neighborhood")
 		default:
-			log.Println("Do not know how to handle GraphQL Field: ", gqlField)
+			log.Println("Do not know how to handle mulch order GraphQL Field: ", gqlField)
 		}
 	}
-	return sqlFields, inputs, joinSql
+	if queryBuilder != nil {
+		queryBuilder = queryBuilder.Select(sqlFields...)
+	}
+	return queryBuilder, inputs
 }
 
 // //////////////////////////////////////////////////////////////////////////
 func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
-	// select order_id  from mulch_spreaders where 'fruser2' = any(spreaders);
-	// select order_owner_id, spreaders from mulch_orders left join mulch_spreaders on mulch_orders.order_id = mulch_spreaders.order_id
-	// where mulch_orders.order_id = '2a166081-787f-4ff6-9477-31b21b6ca2f7';
-
 	order := MulchOrderType{}
-	sqlFields, _, joinSql := mulchOrderGql2SqlMap(params.GqlFields, &order)
-
-	if 0 == len(params.OwnerId) {
-		log.Println("Retrieving mulch orders.")
-	} else {
-		log.Println("Retrieving mulch orders. OwnerId: ", params.OwnerId)
-	}
 
 	doQuery := func() (pgx.Rows, error) {
-		sqlCmd := fmt.Sprintf("select %s from mulch_orders %s", strings.Join(sqlFields, ","), joinSql)
-		if len(params.OwnerId) != 0 {
-			sqlCmd = sqlCmd + " where order_owner_id=$1"
-			log.Println("SqlCmd: ", sqlCmd)
-			return Db.Query(context.Background(), sqlCmd, params.OwnerId)
-		} else if len(params.SpreaderId) != 0 {
-			sqlCmd = sqlCmd + " where $1=any(spreaders)"
-			log.Println("SqlCmd: ", sqlCmd)
-			return Db.Query(context.Background(), sqlCmd, params.SpreaderId)
-		} else {
-			log.Println("SqlCmd: ", sqlCmd)
-			return Db.Query(context.Background(), sqlCmd)
+		queryBuilder := goqu.Dialect("postgres").From("mulch_orders")
+
+		queryBuilder, _ = mulchOrderGql2SqlMap(params.GqlFields, &order, queryBuilder)
+
+		// sqlCmd := fmt.Sprintf("select %s from mulch_orders %s", strings.Join(sqlFields, ","), joinSql)
+		if params.DoGetSpreadOrdersOnly {
+			queryBuilder = queryBuilder.Where(goqu.L(`purchases @> '[{"productId": "spreading"}]'`))
 		}
+
+		if len(params.OwnerId) != 0 {
+			log.Println("Retrieving mulch orders. OwnerId: ", params.OwnerId)
+			queryBuilder = queryBuilder.Where(goqu.Ex{"order_owner_id": params.OwnerId})
+		} else if len(params.SpreaderId) != 0 {
+			queryBuilder = queryBuilder.Where(goqu.V(params.SpreaderId).Eq(goqu.Any(goqu.L("spreaders"))))
+		}
+
+		sqlCmd, args, err := queryBuilder.ToSQL()
+		if err != nil {
+			return nil, err
+		}
+		log.Println("SqlCmd: ", sqlCmd)
+		return Db.Query(context.Background(), sqlCmd, args...)
 	}
 
 	orders := []MulchOrderType{}
@@ -732,7 +741,7 @@ func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 
 	for rows.Next() {
 		order := MulchOrderType{}
-		_, inputs, _ := mulchOrderGql2SqlMap(params.GqlFields, &order)
+		_, inputs := mulchOrderGql2SqlMap(params.GqlFields, &order, nil)
 		err = rows.Scan(inputs...)
 		if err != nil {
 			log.Println("Reading mulch order row failed: ", err)
@@ -759,13 +768,16 @@ func GetMulchOrder(params GetMulchOrderParams) MulchOrderType {
 	log.Println("Retrieving mulch order. OrderId: ", params.OrderId)
 
 	order := MulchOrderType{}
-	sqlFields, inputs, joinSql := mulchOrderGql2SqlMap(params.GqlFields, &order)
+	queryBuilder := goqu.Dialect("postgres").From("mulch_orders").Where(goqu.Ex{"mulch_orders.order_id": params.OrderId})
+	queryBuilder, inputs := mulchOrderGql2SqlMap(params.GqlFields, &order, queryBuilder)
 
-	dbTable := "mulch_orders"
-	sqlCmd := fmt.Sprintf("select %s from %s %s where mulch_orders.order_id=$1", strings.Join(sqlFields, ","), dbTable, joinSql)
-	log.Println("SqlCmd: ", sqlCmd)
-	err := Db.QueryRow(context.Background(), sqlCmd, params.OrderId).Scan(inputs...)
+	sqlCmd, args, err := queryBuilder.ToSQL()
 	if err != nil {
+		log.Println("Mulch order query builder for: ", params.OrderId, " failed", err)
+		return order
+	}
+	log.Println("SqlCmd: ", sqlCmd)
+	if err = Db.QueryRow(context.Background(), sqlCmd, args).Scan(inputs...); err != nil {
 		log.Println("Mulch order query for: ", params.OrderId, " failed", err)
 	}
 	// log.Println("Purchases: ", order.Purchases)

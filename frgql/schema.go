@@ -10,9 +10,7 @@ import (
 	ast "github.com/graphql-go/graphql/language/ast"
 )
 
-var (
-	FrSchema graphql.Schema
-)
+var FrSchema graphql.Schema
 
 // //////////////////////////////////////////////////////////////////////////
 // Function for retrieving selected fields
@@ -45,7 +43,6 @@ func getSelectedFields(selectionPath []string, resolveParams graphql.ResolvePara
 
 // //////////////////////////////////////////////////////////////////////////
 func init() {
-
 	queryFields := make(map[string]*graphql.Field)
 	mutationFields := make(map[string]*graphql.Field)
 
@@ -244,6 +241,10 @@ func init() {
 				Description: "The spreader id for which data should be returned.  If both params empty then all orders are returned",
 				Type:        graphql.String,
 			},
+			"doGetSpreadOrdersOnly": &graphql.ArgumentConfig{
+				Description: "Narrows the search for entries that have spreaders in them",
+				Type:        graphql.Boolean,
+			},
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 			// if is_mulch_order getMulchOrder Else get etc...
@@ -255,6 +256,9 @@ func init() {
 			}
 			if val, ok := p.Args["spreaderId"]; ok {
 				params.SpreaderId = val.(string)
+			}
+			if val, ok := p.Args["doGetSpreadOrdersOnly"]; ok {
+				params.DoGetSpreadOrdersOnly = val.(bool)
 			}
 			isLookingForMoneyCollected := false
 			for _, v := range params.GqlFields {
