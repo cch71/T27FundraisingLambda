@@ -11,14 +11,14 @@ clean:
 	@mkdir -p dist
 
 lambda: clean
-	cd ${MK_DIR}/cmd/lambda && GOOS=linux CGO_ENABLED=0 go build -ldflags="-s -w" -o ${DIST_DIR}/gqlhandler
+	cd ${MK_DIR}/cmd/lambda && GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -tags lambda.norpc -o ${DIST_DIR}/bootstrap
 
 cli: clean
 	cd ${MK_DIR}/cmd/t27frcli && go build -o ${DIST_DIR}/t27frcli
 
 dist: lambda
 	cp $(DB_CA_ROOT_PATH) dist
-	cd dist && zip function.zip gqlhandler root.crt
+	cd dist && zip function.zip bootstrap root.crt
 
 run:
 	aws-sam-local local start-api
