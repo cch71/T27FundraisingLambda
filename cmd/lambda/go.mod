@@ -10,7 +10,7 @@ require (
 )
 
 require (
-	github.com/codingsince1985/geo-golang v1.8.4 // indirect
+	github.com/codingsince1985/geo-golang v1.8.3 // indirect
 	github.com/doug-martin/goqu/v9 v9.19.0 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
