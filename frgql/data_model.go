@@ -777,7 +777,7 @@ func GetMulchOrder(params GetMulchOrderParams) MulchOrderType {
 		return order
 	}
 	log.Println("SqlCmd: ", sqlCmd)
-	if err = Db.QueryRow(context.Background(), sqlCmd, args).Scan(inputs...); err != nil {
+	if err = Db.QueryRow(context.Background(), sqlCmd, args...).Scan(inputs...); err != nil {
 		log.Println("Mulch order query for: ", params.OrderId, " failed", err)
 	}
 	// log.Println("Purchases: ", order.Purchases)
