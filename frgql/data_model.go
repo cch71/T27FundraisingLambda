@@ -183,6 +183,7 @@ func verifyUidAllowedFromCtx(ctx context.Context, uid string) error {
 // //////////////////////////////////////////////////////////////////////////
 type OwnerIdSummaryType struct {
 	TotalDeliveryMinutes                int
+	TotalAssistedSpreadingOrders        int
 	TotalNumBagsSold                    int
 	TotalNumBagsSoldToSpread            int
 	TotalAmountCollectedForDonations    string
@@ -196,16 +197,14 @@ type OwnerIdSummaryType struct {
 }
 
 // //////////////////////////////////////////////////////////////////////////
-func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
-	log.Println("Getting Summary for onwerId: ", ownerId)
-
+func getOrderSummaryByOwnerId(ownerId string, summary *OwnerIdSummaryType) error {
 	sqlCmd := "select purchases::jsonb, amount_from_donations::string, total_amount_collected::string" +
 		" from mulch_orders where order_owner_id = $1"
 
 	rows, err := Db.Query(context.Background(), sqlCmd, ownerId)
 	if err != nil {
 		log.Println("User summary query failed", err)
-		return OwnerIdSummaryType{}, err
+		return err
 	}
 	defer rows.Close()
 
@@ -224,7 +223,7 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 		err = rows.Scan(&purchases, &donationsAsStr, &totalCollectedAsStr)
 		if err != nil {
 			// log.Println("Reading User Summary row failed: ", err)
-			return OwnerIdSummaryType{}, err
+			return err
 		}
 		if totalCollectedAsStr == nil {
 			continue
@@ -232,7 +231,7 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 		// log.Println("TotalCollectedAsStr: ", *totalCollectedAsStr)
 		total, err := decimal.NewFromString(*totalCollectedAsStr)
 		if err != nil {
-			return OwnerIdSummaryType{}, err
+			return err
 		}
 		totalCollected = totalCollected.Add(total)
 
@@ -240,7 +239,7 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 			// log.Println("DonationsStr: ", *donationsAsStr)
 			donationAmt, err := decimal.NewFromString(*donationsAsStr)
 			if err != nil {
-				return OwnerIdSummaryType{}, err
+				return err
 			}
 			totalCollectedForDonations = totalCollectedForDonations.Add(donationAmt)
 		}
@@ -248,15 +247,16 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 		for _, item := range purchases {
 			// log.Println("ItemAmountChargedStr: ", item.AmountCharged)a
 			// ISSUE #108
-			item.AmountCharged = strings.Replace(item.AmountCharged, ",", "", -1)
+			item.AmountCharged = strings.ReplaceAll(item.AmountCharged, ",", "")
 			amt, err := decimal.NewFromString(item.AmountCharged)
 			if err != nil {
-				return OwnerIdSummaryType{}, err
+				return err
 			}
-			if "bags" == item.ProductId {
+			switch item.ProductId {
+			case "bags":
 				numBagsSold = numBagsSold + item.NumSold
 				totalCollectedForBags = totalCollectedForBags.Add(amt)
-			} else if "spreading" == item.ProductId {
+			case "spreading":
 				numBagsToSpreadSold = numBagsToSpreadSold + item.NumSold
 				totalCollectedForSpreading = totalCollectedForSpreading.Add(amt)
 			}
@@ -265,14 +265,23 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 	}
 
 	if rows.Err() != nil {
-		log.Println("Reading User Summary rows had an issue: ", err)
-		return OwnerIdSummaryType{}, err
+		return err
 	}
 
+	summary.TotalNumBagsSold = numBagsSold
+	summary.TotalNumBagsSoldToSpread = numBagsToSpreadSold
+	summary.TotalAmountCollectedForDonations = totalCollectedForDonations.StringFixedBank(4)
+	summary.TotalAmountCollectedForBags = totalCollectedForBags.StringFixedBank(4)
+	summary.TotalAmountCollectedForBagsToSpread = totalCollectedForSpreading.StringFixedBank(4)
+	summary.TotalAmountCollected = totalCollected.StringFixedBank(4)
+	return nil
+}
+
+// //////////////////////////////////////////////////////////////////////////
+func getDeliveryTimecardSummaryByOwnerId(ownerId string, summary *OwnerIdSummaryType) error {
 	timecards, err := GetMulchTimecards(ownerId, -1, []string{"timeTotal"})
 	if err != nil {
-		log.Println("User summary timecard query failed", err)
-		return OwnerIdSummaryType{}, err
+		return err
 	}
 	deliveryMinutes, _ := time.ParseDuration("0s")
 	for _, tc := range timecards {
@@ -283,60 +292,111 @@ func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
 		secs, _ := time.ParseDuration(durarr[2] + "s")
 		deliveryMinutes = deliveryMinutes + hours + mins + secs
 	}
+	summary.TotalDeliveryMinutes = int(math.Floor(deliveryMinutes.Minutes()))
+	return nil
+}
 
+// //////////////////////////////////////////////////////////////////////////
+func getAllocationSummaryByOwnerId(ownerId string, summary *OwnerIdSummaryType) error {
 	allocationsFromDelivery := decimal.NewFromInt(0)
 	allocationsFromBagsSold := decimal.NewFromInt(0)
 	allocationsFromBagsSpread := decimal.NewFromInt(0)
 	allocationsTotal := decimal.NewFromInt(0)
 	var allocFromBagsSoldStr, allocFromBagsSpreadStr, allocFromDeliveryStr, allocTotalStr *string
 
-	sqlCmd = "select allocation_from_bags_sold::string, allocation_from_bags_spread::string, " +
+	sqlCmd := "select allocation_from_bags_sold::string, allocation_from_bags_spread::string, " +
 		"allocation_from_delivery::string, allocation_total::string from allocation_summary where allocation_summary.uid=$1"
 	log.Println("SqlCmd: ", sqlCmd)
-	err = Db.QueryRow(context.Background(), sqlCmd, ownerId).Scan(&allocFromBagsSoldStr, &allocFromBagsSpreadStr, &allocFromDeliveryStr, &allocTotalStr)
-	if err == nil {
-		log.Println("Allocation summary query for: ", ownerId, "alloc: ", allocFromBagsSoldStr)
-		if nil != allocFromBagsSoldStr {
-			allocationsFromBagsSold, err = decimal.NewFromString(*allocFromBagsSoldStr)
-			if err != nil {
-				return OwnerIdSummaryType{}, err
-			}
+	err := Db.QueryRow(context.Background(), sqlCmd, ownerId).Scan(&allocFromBagsSoldStr, &allocFromBagsSpreadStr, &allocFromDeliveryStr, &allocTotalStr)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil
 		}
-
-		if nil != allocFromBagsSpreadStr {
-			allocationsFromBagsSpread, err = decimal.NewFromString(*allocFromBagsSpreadStr)
-			if err != nil {
-				return OwnerIdSummaryType{}, err
-			}
-		}
-		if nil != allocFromDeliveryStr {
-			allocationsFromDelivery, err = decimal.NewFromString(*allocFromDeliveryStr)
-			if err != nil {
-				return OwnerIdSummaryType{}, err
-			}
-		}
-
-		allocationsTotal, err = decimal.NewFromString(*allocTotalStr)
-		if err != nil {
-			return OwnerIdSummaryType{}, err
-		}
-	} else {
-		log.Println("Allocation summary query for: ", ownerId, "failed: ", err)
+		return err
 	}
 
-	return OwnerIdSummaryType{
-		TotalDeliveryMinutes:                int(math.Floor(deliveryMinutes.Minutes())),
-		TotalNumBagsSold:                    numBagsSold,
-		TotalNumBagsSoldToSpread:            numBagsToSpreadSold,
-		TotalAmountCollectedForDonations:    totalCollectedForDonations.StringFixedBank(4),
-		TotalAmountCollectedForBags:         totalCollectedForBags.StringFixedBank(4),
-		TotalAmountCollectedForBagsToSpread: totalCollectedForSpreading.StringFixedBank(4),
-		TotalAmountCollected:                totalCollected.StringFixedBank(4),
-		AllocationsFromDelivery:             allocationsFromDelivery.StringFixedBank(4),
-		AllocationsFromBagsSold:             allocationsFromBagsSold.StringFixedBank(4),
-		AllocationsFromBagsSpread:           allocationsFromBagsSpread.StringFixedBank(4),
-		AllocationsTotal:                    allocationsTotal.StringFixedBank(4),
-	}, nil
+	log.Println("Allocation summary query for: ", ownerId, "alloc: ", allocFromBagsSoldStr)
+	if nil != allocFromBagsSoldStr {
+		allocationsFromBagsSold, err = decimal.NewFromString(*allocFromBagsSoldStr)
+		if err != nil {
+			return err
+		}
+	}
+
+	if nil != allocFromBagsSpreadStr {
+		allocationsFromBagsSpread, err = decimal.NewFromString(*allocFromBagsSpreadStr)
+		if err != nil {
+			return err
+		}
+	}
+	if nil != allocFromDeliveryStr {
+		allocationsFromDelivery, err = decimal.NewFromString(*allocFromDeliveryStr)
+		if err != nil {
+			return err
+		}
+	}
+
+	if nil != allocFromDeliveryStr {
+		allocationsTotal, err = decimal.NewFromString(*allocTotalStr)
+		if err != nil {
+			return err
+		}
+	}
+
+	summary.AllocationsFromDelivery = allocationsFromDelivery.StringFixedBank(4)
+	summary.AllocationsFromBagsSold = allocationsFromBagsSold.StringFixedBank(4)
+	summary.AllocationsFromBagsSpread = allocationsFromBagsSpread.StringFixedBank(4)
+	summary.AllocationsTotal = allocationsTotal.StringFixedBank(4)
+	return nil
+}
+
+func getAssistedSpreadingOrderCountByOwnerId(ownerId string, summary *OwnerIdSummaryType) error {
+	sqlCmd, args, err := goqu.Dialect("postgres").
+		Select(goqu.COUNT("*")).
+		From("mulch_orders").
+		LeftJoin(goqu.T("mulch_spreaders"), goqu.On(goqu.Ex{"mulch_orders.order_id": goqu.I("mulch_spreaders.order_id")})).
+		Where(goqu.And(
+			goqu.V(ownerId).Eq(goqu.Any(goqu.L("spreaders"))),
+			goqu.V(ownerId).Neq("mulch_orders.ownerId"),
+		)).ToSQL()
+	if err != nil {
+		return err
+	}
+	log.Println("SqlCmd: ", sqlCmd)
+	numAssistedOrders := 0
+	if err = Db.QueryRow(context.Background(), sqlCmd, args...).Scan(&numAssistedOrders); err != nil {
+		return err
+	}
+	summary.TotalAssistedSpreadingOrders = numAssistedOrders
+	return nil
+}
+
+// //////////////////////////////////////////////////////////////////////////
+func GetSummaryByOwnerId(ownerId string) (OwnerIdSummaryType, error) {
+	log.Println("Getting Summary for onwerId: ", ownerId)
+
+	summary := OwnerIdSummaryType{}
+	if err := getOrderSummaryByOwnerId(ownerId, &summary); err != nil {
+		log.Println("Get order summary failed", err)
+		return OwnerIdSummaryType{}, err
+	}
+
+	if err := getDeliveryTimecardSummaryByOwnerId(ownerId, &summary); err != nil {
+		log.Println("Summary timecard query failed", err)
+		return OwnerIdSummaryType{}, err
+	}
+
+	if err := getAssistedSpreadingOrderCountByOwnerId(ownerId, &summary); err != nil {
+		log.Println("Summary of assisted spreading orders query failed", err)
+		return OwnerIdSummaryType{}, err
+	}
+
+	if err := getAllocationSummaryByOwnerId(ownerId, &summary); err != nil {
+		log.Println("Allocation summary query failed: ", err)
+		return OwnerIdSummaryType{}, err
+	}
+
+	return summary, nil
 }
 
 // //////////////////////////////////////////////////////////////////////////
@@ -528,6 +588,7 @@ type MulchOrderMoneyCollectedType struct {
 // //////////////////////////////////////////////////////////////////////////
 type GetMulchOrdersParams struct {
 	OwnerId               string
+	ExcludeOwnerId        string
 	SpreaderId            string
 	DoGetSpreadOrdersOnly bool
 	GqlFields             []string
@@ -569,7 +630,7 @@ func GetMulchOrdersMoneyCollected(params GetMulchOrdersParams) []MulchOrderMoney
 	order := MulchOrderMoneyCollectedType{}
 	sqlFields, _, joinSql := gql2sql(&order)
 
-	if 0 == len(params.OwnerId) {
+	if len(params.OwnerId) == 0 {
 		log.Println("Retrieving mulch orders money collected.")
 	} else {
 		log.Println("Retrieving mulch orders money collected. OwnerId: ", params.OwnerId)
@@ -702,6 +763,10 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType, query
 	return queryBuilder, inputs
 }
 
+// select mulch_orders.order_owner_id, mulch_spreaders.spreaders from mulch_orders left
+// join mulch_spreaders on mulch_orders.order_id = mulch_spreaders.order_id where
+// mulch_spreaders.spreaders is not null;
+
 // //////////////////////////////////////////////////////////////////////////
 func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 	order := MulchOrderType{}
@@ -719,7 +784,14 @@ func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 		if len(params.OwnerId) != 0 {
 			log.Println("Retrieving mulch orders. OwnerId: ", params.OwnerId)
 			queryBuilder = queryBuilder.Where(goqu.Ex{"order_owner_id": params.OwnerId})
-		} else if len(params.SpreaderId) != 0 {
+		}
+
+		if len(params.ExcludeOwnerId) != 0 {
+			log.Println("Retrieving mulch orders that exclude OwnerId: ", params.ExcludeOwnerId)
+			queryBuilder = queryBuilder.Where(goqu.Ex{"order_owner_id": goqu.Op{"neq": params.ExcludeOwnerId}})
+		}
+
+		if len(params.SpreaderId) != 0 {
 			queryBuilder = queryBuilder.Where(goqu.V(params.SpreaderId).Eq(goqu.Any(goqu.L("spreaders"))))
 		}
 
@@ -795,7 +867,7 @@ func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 	// Sometimes orders come in with "0" for amount fields and we do
 	// not want to put those in the database so this strips them out
 	strip_0_from_str := func(amount *string) {
-		if "0" == *amount {
+		if *amount == "0" {
 			values = append(values, nil)
 			valIdxs = append(valIdxs, fmt.Sprintf("$%d", valIdx))
 		} else {
@@ -940,10 +1012,10 @@ func OrderType2Sql(order MulchOrderType) ([]string, []string, []interface{}) {
 func CreateMulchOrder(ctx context.Context, order MulchOrderType) (string, error) {
 	log.Println("Creating Order: ", order)
 
-	if 0 == len(order.OrderId) {
+	if len(order.OrderId) == 0 {
 		return "", errors.New("orderId must be provided for a new record")
 	}
-	if 0 == len(order.OwnerId) {
+	if len(order.OwnerId) == 0 {
 		return "", errors.New("ownerId must be provided for a new record")
 	}
 
@@ -951,20 +1023,20 @@ func CreateMulchOrder(ctx context.Context, order MulchOrderType) (string, error)
 		return "", err
 	}
 
-	if 0 == len(order.Customer.Neighborhood) || "none" == order.Customer.Neighborhood {
-		return "", errors.New("Neighborhood must be provided for a new record")
+	if len(order.Customer.Neighborhood) == 0 || order.Customer.Neighborhood == "none" {
+		return "", errors.New("neighborhood must be provided for a new record")
 	}
-	if 0 == len(order.Customer.Name) {
-		return "", errors.New("Name must be provided for a new record")
+	if len(order.Customer.Name) == 0 {
+		return "", errors.New("name must be provided for a new record")
 	}
-	if 0 == len(order.Customer.Addr1) {
-		return "", errors.New("Address 1 must be provided for a new record")
+	if len(order.Customer.Addr1) == 0 {
+		return "", errors.New("address 1 must be provided for a new record")
 	}
-	if 0 == len(order.Customer.Phone) {
-		return "", errors.New("Phone must be provided for a new record")
+	if len(order.Customer.Phone) == 0 {
+		return "", errors.New("phone must be provided for a new record")
 	}
-	if 0 == len(*order.AmountTotalCollected) {
-		return "", errors.New("Order purchases are empty and must be provided for a new record")
+	if len(*order.AmountTotalCollected) == 0 {
+		return "", errors.New("order purchases are empty and must be provided for a new record")
 	}
 	sqlFields, valIdxs, values := OrderType2Sql(order)
 
@@ -984,10 +1056,10 @@ func CreateMulchOrder(ctx context.Context, order MulchOrderType) (string, error)
 func UpdateMulchOrder(ctx context.Context, order MulchOrderType) (bool, error) {
 	log.Println("Updating Order: ", order)
 
-	if 0 == len(order.OrderId) {
+	if len(order.OrderId) == 0 {
 		return false, errors.New("orderId must be provided for updated record")
 	}
-	if 0 == len(order.OwnerId) {
+	if len(order.OwnerId) == 0 {
 		return false, errors.New("ownerId must be provided for updated record")
 	}
 
@@ -1114,33 +1186,33 @@ func GetFundraiserConfig(gqlFields []string) (FrConfigType, error) {
 	sqlFields := []string{}
 
 	for _, gqlField := range gqlFields {
-		switch {
-		case "kind" == gqlField:
+		switch gqlField {
+		case "kind":
 			params = append(params, &frConfig.Kind)
 			sqlFields = append(sqlFields, "kind")
-		case "description" == gqlField:
+		case "description":
 			params = append(params, &frConfig.Description)
 			sqlFields = append(sqlFields, "description")
-		case "lastModifiedTime" == gqlField:
+		case "lastModifiedTime":
 			params = append(params, &frConfig.LastModifiedTime)
 			sqlFields = append(sqlFields, "last_modified_time::string")
-		case "mulchDeliveryConfigs" == gqlField:
+		case "mulchDeliveryConfigs":
 			params = append(params, &frConfig.MulchDeliveryConfigs)
 			sqlFields = append(sqlFields, "mulch_delivery_configs::jsonb")
-		case "products" == gqlField:
+		case "products":
 			params = append(params, &frConfig.Products)
 			sqlFields = append(sqlFields, "products::jsonb")
-		case "finalizationData" == gqlField:
+		case "finalizationData":
 			params = append(params, &frConfig.FinalizationData)
 			sqlFields = append(sqlFields, "finalization_data::jsonb")
-		case "isLocked" == gqlField:
+		case "isLocked":
 			params = append(params, &frConfig.IsLocked)
 			sqlFields = append(sqlFields, "is_locked")
-		case "users" == gqlField:
-		case "neighborhoods" == gqlField:
+		case "users":
+		case "neighborhoods":
 			// Skipping because it is handled seperately
 		default:
-			return frConfig, errors.New(fmt.Sprintf("Unknown fundraiser config field: %s", gqlField))
+			return frConfig, fmt.Errorf("unknown fundraiser config field: %s", gqlField)
 		}
 	}
 
@@ -1211,7 +1283,7 @@ func setFundraiserConfigWithTrxn(ctx context.Context, trxn *pgx.Tx, frConfig FrC
 	log.Println("Setting Fundraiding Config (with Trxn): ", frConfig)
 
 	log.Println("Deleting existing record")
-	_, err := (*trxn).Exec(context.Background(), "delete from fundraiser_config")
+	_, err := (*trxn).Exec(ctx, "delete from fundraiser_config")
 	if err != nil {
 		return err
 	}
@@ -1323,7 +1395,7 @@ func updateFundraiserConfigWithTrxn(ctx context.Context, trxn *pgx.Tx, frConfig 
 		strings.Join(updateSqlFlds, ","))
 
 	log.Println("Update Config SqlCmd: ", sqlCmd)
-	_, err := (*trxn).Exec(context.Background(), sqlCmd, values...)
+	_, err := (*trxn).Exec(ctx, sqlCmd, values...)
 	if err != nil {
 		return err
 	}
@@ -1344,7 +1416,7 @@ func UpdateFundraiserConfig(ctx context.Context, frConfig FrConfigType) (bool, e
 	}
 
 	// Start Database Operations
-	trxn, err := Db.Begin(context.Background())
+	trxn, err := Db.Begin(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -1381,16 +1453,16 @@ func GetNeighborhoods(gqlFields []string) ([]NeighborhoodInfo, error) {
 	sqlFields := []string{}
 
 	for _, gqlField := range gqlFields {
-		switch {
-		case "name" == gqlField:
+		switch gqlField {
+		case "name":
 			sqlFields = append(sqlFields, "name")
-		case "zipcode" == gqlField:
+		case "zipcode":
 			sqlFields = append(sqlFields, "zipcode")
-		case "city" == gqlField:
+		case "city":
 			sqlFields = append(sqlFields, "city")
-		case "isVisible" == gqlField:
+		case "isVisible":
 			sqlFields = append(sqlFields, "is_visible")
-		case "distributionPoint" == gqlField:
+		case "distributionPoint":
 			sqlFields = append(sqlFields, "dist_pt")
 		default:
 			return neighborhoods, fmt.Errorf("unknown fundraiser neighborhood field: %s", gqlField)
@@ -1409,16 +1481,16 @@ func GetNeighborhoods(gqlFields []string) ([]NeighborhoodInfo, error) {
 		hood := NeighborhoodInfo{}
 		inputs := []interface{}{}
 		for _, gqlField := range gqlFields {
-			switch {
-			case "name" == gqlField:
+			switch gqlField {
+			case "name":
 				inputs = append(inputs, &hood.Name)
-			case "zipcode" == gqlField:
+			case "zipcode":
 				inputs = append(inputs, &hood.Zipcode)
-			case "city" == gqlField:
+			case "city":
 				inputs = append(inputs, &hood.City)
-			case "isVisible" == gqlField:
+			case "isVisible":
 				inputs = append(inputs, &hood.IsVisible)
-			case "distributionPoint" == gqlField:
+			case "distributionPoint":
 				inputs = append(inputs, &hood.DistributionPoint)
 			default:
 				return neighborhoods, fmt.Errorf("unknown fundraiser neighborhood field: %s", gqlField)
@@ -1592,23 +1664,23 @@ func mulchTimecardGql2SqlMap(gqlFields []string, tc *MulchTimecardType) ([]strin
 	inputs := []interface{}{}
 
 	for _, gqlField := range gqlFields {
-		switch {
-		case "id" == gqlField:
+		switch gqlField {
+		case "id":
 			inputs = append(inputs, &tc.Id)
 			sqlFields = append(sqlFields, "uid")
-		case "deliveryId" == gqlField:
+		case "deliveryId":
 			inputs = append(inputs, &tc.DeliveryId)
 			sqlFields = append(sqlFields, "delivery_id")
-		case "lastModifiedTime" == gqlField:
+		case "lastModifiedTime":
 			inputs = append(inputs, &tc.LastModifiedTime)
 			sqlFields = append(sqlFields, "last_modified_time::string")
-		case "timeIn" == gqlField:
+		case "timeIn":
 			inputs = append(inputs, &tc.TimeIn)
 			sqlFields = append(sqlFields, "time_in::string")
-		case "timeOut" == gqlField:
+		case "timeOut":
 			inputs = append(inputs, &tc.TimeOut)
 			sqlFields = append(sqlFields, "time_out::string")
-		case "timeTotal" == gqlField:
+		case "timeTotal":
 			inputs = append(inputs, &tc.TimeTotal)
 			sqlFields = append(sqlFields, "time_total::string")
 		default:
@@ -1750,20 +1822,20 @@ func GetUsers(params GetUsersParams) ([]UserInfo, error) {
 		doWantFullNames := false
 		exists := struct{}{}
 		for _, gqlField := range params.GqlFields {
-			switch {
-			case "firstName" == gqlField:
+			switch gqlField {
+			case "firstName":
 				sqlFieldSet["first_name"] = exists
-			case "lastName" == gqlField:
+			case "lastName":
 				sqlFieldSet["last_name"] = exists
-			case "name" == gqlField:
+			case "name":
 				doWantFullNames = true
 				sqlFieldSet["first_name"] = exists
 				sqlFieldSet["last_name"] = exists
-			case "id" == gqlField:
+			case "id":
 				sqlFieldSet["id"] = exists
-			case "group" == gqlField:
+			case "group":
 				sqlFieldSet["group_id"] = exists
-			case "hasAuthCreds" == gqlField:
+			case "hasAuthCreds":
 				sqlFieldSet["has_auth_creds"] = exists
 			default:
 				return sqlFields, false, fmt.Errorf("unknown fundraiser user field: %s", gqlField)
@@ -1796,16 +1868,16 @@ func GetUsers(params GetUsersParams) ([]UserInfo, error) {
 		user := UserInfo{}
 		inputs := []interface{}{}
 		for _, fld := range sqlFields {
-			switch {
-			case "first_name" == fld:
+			switch fld {
+			case "first_name":
 				inputs = append(inputs, &user.FirstName)
-			case "last_name" == fld:
+			case "last_name":
 				inputs = append(inputs, &user.LastName)
-			case "id" == fld:
+			case "id":
 				inputs = append(inputs, &user.Id)
-			case "group_id" == fld:
+			case "group_id":
 				inputs = append(inputs, &user.Group)
-			case "has_auth_creds" == fld:
+			case "has_auth_creds":
 				inputs = append(inputs, &user.HasAuthCreds)
 			default:
 				return users, fmt.Errorf("unknown fundraiser user db field: %s", fld)
