@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/graphql-go/graphql"
 	ast "github.com/graphql-go/graphql/language/ast"
 )
@@ -16,6 +17,7 @@ var FrSchema graphql.Schema
 // Function for retrieving selected fields
 func getSelectedFields(selectionPath []string, resolveParams graphql.ResolveParams) []string {
 	fields := resolveParams.Info.FieldASTs
+	gqlOutFields := mapset.NewSet[string]()
 
 	for _, propName := range selectionPath {
 		found := false
@@ -34,11 +36,11 @@ func getSelectedFields(selectionPath []string, resolveParams graphql.ResolvePara
 			return []string{}
 		}
 	}
-	var collect []string
+
 	for _, field := range fields {
-		collect = append(collect, field.Name.Value)
+		gqlOutFields.Add(field.Name.Value)
 	}
-	return collect
+	return gqlOutFields.ToSlice()
 }
 
 // //////////////////////////////////////////////////////////////////////////
@@ -234,15 +236,19 @@ func init() {
 		Description: "Retrieves order associated with ownerId",
 		Args: graphql.FieldConfigArgument{
 			"ownerId": &graphql.ArgumentConfig{
-				Description: "The owner id for which data should be returned.  If both params empty then all orders are returned",
+				Description: "Narrows the search for orders with this owner id.",
+				Type:        graphql.String,
+			},
+			"excludeOwnerId": &graphql.ArgumentConfig{
+				Description: "Narrows the search for orders that do not contain this owner id.",
 				Type:        graphql.String,
 			},
 			"spreaderId": &graphql.ArgumentConfig{
-				Description: "The spreader id for which data should be returned.  If both params empty then all orders are returned",
+				Description: "Narrows the search for orders with this spreader id.",
 				Type:        graphql.String,
 			},
 			"doGetSpreadOrdersOnly": &graphql.ArgumentConfig{
-				Description: "Narrows the search for entries that have spreaders in them",
+				Description: "Narrows the search for entries that have spread jobs in them",
 				Type:        graphql.Boolean,
 			},
 		},
@@ -253,6 +259,9 @@ func init() {
 			}
 			if val, ok := p.Args["ownerId"]; ok {
 				params.OwnerId = val.(string)
+			}
+			if val, ok := p.Args["excludeOwnerId"]; ok {
+				params.ExcludeOwnerId = val.(string)
 			}
 			if val, ok := p.Args["spreaderId"]; ok {
 				params.SpreaderId = val.(string)
@@ -767,6 +776,7 @@ func init() {
 		Description: "Summary information for a specfic OnwerID",
 		Fields: graphql.Fields{
 			"totalDeliveryMinutes":                &graphql.Field{Type: graphql.Int},
+			"totalAssistedSpreadingOrders":        &graphql.Field{Type: graphql.Int},
 			"totalNumBagsSold":                    &graphql.Field{Type: graphql.Int},
 			"totalNumBagsSoldToSpread":            &graphql.Field{Type: graphql.Int},
 			"totalAmountCollectedForDonations":    &graphql.Field{Type: graphql.String},
