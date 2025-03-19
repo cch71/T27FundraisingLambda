@@ -6,6 +6,7 @@ require github.com/graphql-go/graphql v0.8.1
 
 require (
 	github.com/codingsince1985/geo-golang v1.8.3
+	github.com/deckarep/golang-set/v2 v2.8.0
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/jackc/pgx/v5 v5.7.2
@@ -13,7 +14,6 @@ require (
 )
 
 require (
-	github.com/deckarep/golang-set/v2 v2.8.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
