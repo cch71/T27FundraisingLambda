@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -734,7 +735,6 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType, query
 				queryBuilder = queryBuilder.LeftJoin(goqu.T("mulch_spreaders"),
 					goqu.On(goqu.Ex{"mulch_orders.order_id": goqu.I("mulch_spreaders.order_id")}),
 				)
-				// joinSql = "LEFT JOIN mulch_spreaders ON mulch_orders.order_id = mulch_spreaders.order_id"
 			}
 		case "customer":
 			inputs = append(inputs, &orderOutput.Customer.Name)
@@ -763,10 +763,6 @@ func mulchOrderGql2SqlMap(gqlFields []string, orderOutput *MulchOrderType, query
 	return queryBuilder, inputs
 }
 
-// select mulch_orders.order_owner_id, mulch_spreaders.spreaders from mulch_orders left
-// join mulch_spreaders on mulch_orders.order_id = mulch_spreaders.order_id where
-// mulch_spreaders.spreaders is not null;
-
 // //////////////////////////////////////////////////////////////////////////
 func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 	order := MulchOrderType{}
@@ -775,11 +771,6 @@ func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 		queryBuilder := goqu.Dialect("postgres").From("mulch_orders")
 
 		queryBuilder, _ = mulchOrderGql2SqlMap(params.GqlFields, &order, queryBuilder)
-
-		// sqlCmd := fmt.Sprintf("select %s from mulch_orders %s", strings.Join(sqlFields, ","), joinSql)
-		if params.DoGetSpreadOrdersOnly {
-			queryBuilder = queryBuilder.Where(goqu.L(`purchases @> '[{"productId": "spreading"}]'`))
-		}
 
 		if len(params.OwnerId) != 0 {
 			log.Println("Retrieving mulch orders. OwnerId: ", params.OwnerId)
@@ -791,7 +782,18 @@ func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 			queryBuilder = queryBuilder.Where(goqu.Ex{"order_owner_id": goqu.Op{"neq": params.ExcludeOwnerId}})
 		}
 
+		if params.DoGetSpreadOrdersOnly {
+			queryBuilder = queryBuilder.Where(goqu.L(`purchases @> '[{"productId": "spreading"}]'`))
+		}
+
 		if len(params.SpreaderId) != 0 {
+			// if spreaders aren't in the GQL query then we need to make the join here.
+			if !slices.Contains(params.GqlFields, "spreaders") {
+				queryBuilder = queryBuilder.LeftJoin(goqu.T("mulch_spreaders"),
+					goqu.On(goqu.Ex{"mulch_orders.order_id": goqu.I("mulch_spreaders.order_id")}),
+				)
+			}
+
 			queryBuilder = queryBuilder.Where(goqu.V(params.SpreaderId).Eq(goqu.Any(goqu.L("spreaders"))))
 		}
 
@@ -811,6 +813,7 @@ func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 	}
 	defer rows.Close()
 
+	// Process query results
 	for rows.Next() {
 		order := MulchOrderType{}
 		_, inputs := mulchOrderGql2SqlMap(params.GqlFields, &order, nil)

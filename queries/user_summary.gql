@@ -1,6 +1,6 @@
 {
   summary {
-    orderOwner(ownerId: "nsalinas") {
+    orderOwner(ownerId: "rspence") {
       totalDeliveryMinutes
       totalAssistedSpreadingOrders
       totalNumBagsSold

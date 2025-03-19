@@ -1,0 +1,10 @@
+{
+  mulchOrders(spreaderId: "rspence", excludeOwnerId: "rspence", doGetSpreadOrdersOnly: true) {
+    orderId
+    ownerId
+    customer {
+        addr1
+        neighborhood
+    }
+  }
+}

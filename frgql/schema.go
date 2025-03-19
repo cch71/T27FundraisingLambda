@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/graphql-go/graphql"
 	ast "github.com/graphql-go/graphql/language/ast"
 )
@@ -16,6 +17,7 @@ var FrSchema graphql.Schema
 // Function for retrieving selected fields
 func getSelectedFields(selectionPath []string, resolveParams graphql.ResolveParams) []string {
 	fields := resolveParams.Info.FieldASTs
+	gqlOutFields := mapset.NewSet[string]()
 
 	for _, propName := range selectionPath {
 		found := false
@@ -34,11 +36,11 @@ func getSelectedFields(selectionPath []string, resolveParams graphql.ResolvePara
 			return []string{}
 		}
 	}
-	var collect []string
+
 	for _, field := range fields {
-		collect = append(collect, field.Name.Value)
+		gqlOutFields.Add(field.Name.Value)
 	}
-	return collect
+	return gqlOutFields.ToSlice()
 }
 
 // //////////////////////////////////////////////////////////////////////////
