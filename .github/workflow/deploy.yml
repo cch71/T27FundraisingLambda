@@ -1,0 +1,31 @@
+name: Deploy Go Lambda
+
+on:
+  # release: 
+  #  types: [published]
+  workflow_dispatch:
+
+  jobs:
+    my-job:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Build Lambda
+          uses: ./.github/workflows/build@main
+
+        - name: Package Lambda
+          run: |
+            cd ./cmd/lambda/dist
+            zip function.zip bootstrap root.crt
+
+        - name: Configure AWS credentials
+          uses: aws-actions/configure-aws-credentials@v4
+          with:
+            aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            aws-region: us-east-1
+
+        - name: Deploy Lambda function
+          uses: aws-actions/aws-cli@v2
+          with:
+            command: lambda update-function-code
+            args: --function-name your_lambda_function_name --zip-file fileb://function.zip
