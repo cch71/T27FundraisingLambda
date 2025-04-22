@@ -33,9 +33,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Tidy up go.mod
-        run: go mod tidy
-
       - name: Build and package Lambda
         run: |
           cd ./cmd/lambda
