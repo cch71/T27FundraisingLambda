@@ -1,10 +1,15 @@
 {
-  mulchOrders(spreaderId: "rspence", excludeOwnerId: "rspence", doGetSpreadOrdersOnly: true) {
+  mulchOrders(spreaderId: "gletourneau", excludeOwnerId: "gletourneau", doGetSpreadOrdersOnly: true) {
     orderId
     ownerId
     customer {
         addr1
         neighborhood
     }
+    purchases {
+        productId
+        numSold
+    }
+    spreaders
   }
 }

@@ -2,6 +2,7 @@
   summary {
     orderOwner(ownerId: "gletourneau") {
       totalDeliveryMinutes
+      totalAssistedSpreadingOrders
       totalAssistedSpreadingBags
       totalNumBagsSold
       totalNumBagsSoldToSpread

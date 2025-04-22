@@ -358,7 +358,7 @@ func getAssistedSpreadingOrderCountByOwnerId(ownerId string, summary *OwnerIdSum
 		LeftJoin(goqu.T("mulch_spreaders"), goqu.On(goqu.Ex{"mulch_orders.order_id": goqu.I("mulch_spreaders.order_id")})).
 		Where(goqu.And(
 			goqu.V(ownerId).Eq(goqu.Any(goqu.L("spreaders"))),
-			goqu.V(ownerId).Neq("mulch_orders.ownerId"),
+			goqu.V(ownerId).Neq(goqu.L("order_owner_id")),
 		)).ToSQL()
 	if err != nil {
 		return err
