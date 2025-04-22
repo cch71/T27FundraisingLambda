@@ -777,6 +777,7 @@ func init() {
 		Fields: graphql.Fields{
 			"totalDeliveryMinutes":                &graphql.Field{Type: graphql.Int},
 			"totalAssistedSpreadingOrders":        &graphql.Field{Type: graphql.Int},
+			"totalAssistedSpreadingBags":          &graphql.Field{Type: graphql.String},
 			"totalNumBagsSold":                    &graphql.Field{Type: graphql.Int},
 			"totalNumBagsSoldToSpread":            &graphql.Field{Type: graphql.Int},
 			"totalAmountCollectedForDonations":    &graphql.Field{Type: graphql.String},

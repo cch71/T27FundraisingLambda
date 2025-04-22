@@ -185,6 +185,7 @@ func verifyUidAllowedFromCtx(ctx context.Context, uid string) error {
 type OwnerIdSummaryType struct {
 	TotalDeliveryMinutes                int
 	TotalAssistedSpreadingOrders        int
+	TotalAssistedSpreadingBags          string
 	TotalNumBagsSold                    int
 	TotalNumBagsSoldToSpread            int
 	TotalAmountCollectedForDonations    string
@@ -261,11 +262,10 @@ func getOrderSummaryByOwnerId(ownerId string, summary *OwnerIdSummaryType) error
 				numBagsToSpreadSold = numBagsToSpreadSold + item.NumSold
 				totalCollectedForSpreading = totalCollectedForSpreading.Add(amt)
 			}
-
 		}
 	}
 
-	if rows.Err() != nil {
+	if err := rows.Err(); err != nil {
 		return err
 	}
 
@@ -353,7 +353,7 @@ func getAllocationSummaryByOwnerId(ownerId string, summary *OwnerIdSummaryType) 
 
 func getAssistedSpreadingOrderCountByOwnerId(ownerId string, summary *OwnerIdSummaryType) error {
 	sqlCmd, args, err := goqu.Dialect("postgres").
-		Select(goqu.COUNT("*")).
+		Select("purchases", "spreaders").
 		From("mulch_orders").
 		LeftJoin(goqu.T("mulch_spreaders"), goqu.On(goqu.Ex{"mulch_orders.order_id": goqu.I("mulch_spreaders.order_id")})).
 		Where(goqu.And(
@@ -364,11 +364,50 @@ func getAssistedSpreadingOrderCountByOwnerId(ownerId string, summary *OwnerIdSum
 		return err
 	}
 	log.Println("SqlCmd: ", sqlCmd)
-	numAssistedOrders := 0
-	if err = Db.QueryRow(context.Background(), sqlCmd, args...).Scan(&numAssistedOrders); err != nil {
+	rows, err := Db.Query(context.Background(), sqlCmd, args...)
+	if err != nil {
+		log.Println("Getting assisted spreading order summary query failed", err)
 		return err
 	}
+	defer rows.Close()
+
+	numAssistedOrders := 0
+	numPersonSpread := decimal.NewFromFloat(0.0)
+	for rows.Next() {
+		var purchases []ProductsType
+		var spreaders []string
+
+		err = rows.Scan(&purchases, &spreaders)
+		if err != nil {
+			log.Println("Reading assisted spreading row failed: ", err)
+			return err
+		}
+		num_spreaders := int64(len(spreaders))
+		if num_spreaders == 0 {
+			continue
+		}
+
+		numBags := int64(0)
+		for _, item := range purchases {
+			if item.ProductId == "spreading" {
+				numBags = int64(item.NumSold)
+				break
+			}
+		}
+
+		numPerPersonSpreadBags := decimal.NewFromInt(numBags).Div(decimal.NewFromInt(num_spreaders))
+		numPersonSpread = numPersonSpread.Add(numPerPersonSpreadBags)
+
+		numAssistedOrders = numAssistedOrders + 1
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Println("Reading Summary rows had an issue: ", err)
+		return err
+	}
+
 	summary.TotalAssistedSpreadingOrders = numAssistedOrders
+	summary.TotalAssistedSpreadingBags = numPersonSpread.RoundBank(2).String()
 	return nil
 }
 
@@ -464,7 +503,7 @@ func GetTroopSummary(numTopSellers int) (TroopSummaryType, error) {
 		topSellers = append(topSellers, TopSellerType{Name: fmt.Sprintf("%s %s", firstName, lastName), TotalAmountCollected: totalAsStr})
 	}
 
-	if rows.Err() != nil {
+	if err := rows.Err(); err != nil {
 		log.Println("Reading Summary rows had an issue: ", err)
 		return TroopSummaryType{}, err
 	}
@@ -530,7 +569,7 @@ func GetNeighborhoodSummary() ([]NeighborhoodSummaryType, error) {
 		results = append(results, result)
 	}
 
-	if rows.Err() != nil {
+	if err := rows.Err(); err != nil {
 		log.Println("Reading Summary rows had an issue: ", err)
 		return nil, err
 	}
@@ -669,7 +708,7 @@ func GetMulchOrdersMoneyCollected(params GetMulchOrdersParams) []MulchOrderMoney
 		orders = append(orders, order)
 	}
 
-	if rows.Err() != nil {
+	if err := rows.Err(); err != nil {
 		log.Println("Reading mulch order money collection rows had an issue: ", err)
 		return []MulchOrderMoneyCollectedType{}
 	}
@@ -825,7 +864,7 @@ func GetMulchOrders(params GetMulchOrdersParams) []MulchOrderType {
 		orders = append(orders, order)
 	}
 
-	if rows.Err() != nil {
+	if err := rows.Err(); err != nil {
 		log.Println("Reading mulch order rows had an issue: ", err)
 		return []MulchOrderType{}
 	}
@@ -1507,7 +1546,7 @@ func GetNeighborhoods(gqlFields []string) ([]NeighborhoodInfo, error) {
 		neighborhoods = append(neighborhoods, hood)
 	}
 
-	if rows.Err() != nil {
+	if err := rows.Err(); err != nil {
 		log.Println("Reading Neighborhood rows had an issue: ", err)
 		return []NeighborhoodInfo{}, err
 	}
@@ -1743,7 +1782,7 @@ func GetMulchTimecards(id string, deliveryId int, gqlFields []string) ([]MulchTi
 		timecards = append(timecards, tc)
 	}
 
-	if rows.Err() != nil {
+	if err := rows.Err(); err != nil {
 		log.Println("Reading timecard rows had an issue: ", err)
 		return []MulchTimecardType{}, nil
 	}
@@ -1897,7 +1936,7 @@ func GetUsers(params GetUsersParams) ([]UserInfo, error) {
 		users = append(users, user)
 	}
 
-	if rows.Err() != nil {
+	if err := rows.Err(); err != nil {
 		log.Println("Reading User rows had an issue: ", err)
 		return []UserInfo{}, err
 	}
