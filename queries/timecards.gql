@@ -1,5 +1,5 @@
 {
-  mulchTimecards(deliveryId: 1, id: "lletourneau"){
+  mulchTimecards(deliveryId: 1){
     id,
     lastModifiedTime,
     deliveryId
