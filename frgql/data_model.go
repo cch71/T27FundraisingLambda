@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
@@ -103,7 +103,7 @@ type T27FrClaims struct {
 	Roles    []string `json:"groups"`
 	FullName string   `json:"name"`
 	Id       string   `json:"preferred_username"`
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 // //////////////////////////////////////////////////////////////////////////
