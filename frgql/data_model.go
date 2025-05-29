@@ -311,6 +311,11 @@ func getAllocationSummaryByOwnerId(ownerId string, summary *OwnerIdSummaryType) 
 	err := Db.QueryRow(context.Background(), sqlCmd, ownerId).Scan(&allocFromBagsSoldStr, &allocFromBagsSpreadStr, &allocFromDeliveryStr, &allocTotalStr)
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			// Need to make sure these values aren't just empty strings
+			summary.AllocationsFromDelivery = "0"
+			summary.AllocationsFromBagsSold = "0"
+			summary.AllocationsFromBagsSpread = "0"
+			summary.AllocationsTotal = "0"
 			return nil
 		}
 		return err
@@ -343,7 +348,6 @@ func getAllocationSummaryByOwnerId(ownerId string, summary *OwnerIdSummaryType) 
 			return err
 		}
 	}
-
 	summary.AllocationsFromDelivery = allocationsFromDelivery.StringFixedBank(4)
 	summary.AllocationsFromBagsSold = allocationsFromBagsSold.StringFixedBank(4)
 	summary.AllocationsFromBagsSpread = allocationsFromBagsSpread.StringFixedBank(4)
