@@ -162,6 +162,7 @@ func generatePassword() string {
 	}
 	pw = strings.ReplaceAll(pw, ",", "^")
 	pw = strings.ReplaceAll(pw, "l", "k")
+	pw = strings.ReplaceAll(pw, "|", "P")
 	pw = strings.ReplaceAll(pw, "O", "r")
 	pw = strings.ReplaceAll(pw, "o", "A")
 	pw = strings.ReplaceAll(pw, "i", "b")
