@@ -10,8 +10,8 @@ require (
 	github.com/codingsince1985/geo-golang v1.8.5
 	github.com/deckarep/golang-set/v2 v2.8.0
 	github.com/doug-martin/goqu/v9 v9.19.0
-	github.com/golang-jwt/jwt/v5 v5.2.2
-	github.com/jackc/pgx/v5 v5.7.5
+	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/jackc/pgx/v5 v5.8.0
 	github.com/shopspring/decimal v1.4.0
 )
 
@@ -21,7 +21,6 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/lib/pq v1.10.2 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
-	golang.org/x/sync v0.18.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
 )
