@@ -1,8 +1,6 @@
 module frgql
 
-go 1.24.1
-
-toolchain go1.24.2
+go 1.25.0
 
 require github.com/graphql-go/graphql v0.8.1
 
@@ -11,7 +9,7 @@ require (
 	github.com/deckarep/golang-set/v2 v2.8.0
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/jackc/pgx/v5 v5.8.0
+	github.com/jackc/pgx/v5 v5.9.0
 	github.com/shopspring/decimal v1.4.0
 )
 
